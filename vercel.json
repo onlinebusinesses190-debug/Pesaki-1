@@ -1,4 +1,14 @@
 {
-  "rootDirectory": "pesaki",
-  "framework": "nextjs"
+  "builds": [
+    {
+      "src": "pesaki/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "pesaki/$1"
+    }
+  ]
 }
