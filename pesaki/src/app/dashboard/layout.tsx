@@ -13,7 +13,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         return redirect('/login')
     }
 
+    // Also verify external server connectivity by checking wallet
     const wallet = await getWallet()
+    if (!wallet) {
+        // If wallet can't be loaded, server is likely down - redirect to login
+        return redirect('/login?error=server_unavailable')
+    }
 
     return (
         <SidebarShell wallet={wallet}>

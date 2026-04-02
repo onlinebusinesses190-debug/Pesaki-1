@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -11,6 +11,14 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null)
     const [message, setMessage] = useState<string | null>(null)
     const router = useRouter()
+
+    // Check for server error in URL params
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search)
+        if (urlParams.get('error') === 'server_unavailable') {
+            setError('Server is currently unavailable. Please try again later.')
+        }
+    }, [])
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault()
