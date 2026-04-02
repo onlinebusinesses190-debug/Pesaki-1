@@ -5,11 +5,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 export async function apiRequest(path: string, options: RequestInit = {}) {
     const supabase = createBrowserClient();
     const { data: { session } } = await supabase.auth.getSession();
-    
-    const headers = new Headers(options.headers);
-    if (session?.access_token) {
-        headers.set('Authorization', `Bearer ${session.access_token}`);
+
+    if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in to continue.');
     }
+
+    const headers = new Headers(options.headers);
+    headers.set('Authorization', `Bearer ${session.access_token}`);
     headers.set('Content-Type', 'application/json');
 
     const fetchUrl = (path.startsWith('http') || path.startsWith('/api/')) ? path : `${API_URL}${path}`;

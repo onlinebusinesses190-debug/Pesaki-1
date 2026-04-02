@@ -8,14 +8,20 @@ import { createClient } from '@/utils/supabase/client'
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
 import { ModeToggle } from '@/components/dashboard/ModeToggle'
+import { useAuthGuard } from '@/utils/auth'
 
 type GameStatus = 'WAITING' | 'FLYING' | 'CRASHED'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function AviatorPage() {
+    const authReady = useAuthGuard()
     const [status, setStatus] = useState<GameStatus>('WAITING')
     const [multiplier, setMultiplier] = useState(1.00)
+
+    if (!authReady) {
+        return <div className="w-full text-center py-24 text-white">Validating session…</div>
+    }
     const [betAmount, setBetAmount] = useState('100')
     const [cashedOut, setCashedOut] = useState(false)
     const [cashOutMultiplier, setCashOutMultiplier] = useState(0)

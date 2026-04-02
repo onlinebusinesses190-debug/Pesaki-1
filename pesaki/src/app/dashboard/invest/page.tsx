@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAuthGuard } from '@/utils/auth'
 import {
     TrendingUp, TrendingDown, Building2,
     ArrowUp, ArrowDown, Search,
@@ -175,6 +176,12 @@ export default function InvestmentPage() {
         }
     }, [])
 
+    const authReady = useAuthGuard()
+
+    if (!authReady) {
+        return <div className="w-full text-center py-24 text-white">Validating session…</div>
+    }
+
     useEffect(() => { fetchStocks() }, [fetchStocks])
 
     // ── Derived ────────────────────────────────────────────────────────────────
@@ -204,6 +211,10 @@ export default function InvestmentPage() {
             setSelectedStock(null)
             setPrediction(null)
         } catch (err: any) {
+            if (err.message?.includes('Authentication required')) {
+                toast.error('Please login first to place predictions.');
+                return
+            }
             toast.error(err.message || 'Failed to place prediction')
         } finally {
             setIsPlacing(false)

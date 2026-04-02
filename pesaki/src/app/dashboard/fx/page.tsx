@@ -6,6 +6,7 @@ import { TradingChart } from '@/components/fx/TradingChart'
 import { ArrowUp, ArrowDown, Activity, RefreshCw } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
+import { useAuthGuard } from '@/utils/auth'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -27,8 +28,13 @@ const generateData = (count: number, basePrice: number) => {
 }
 
 export default function FXPage() {
+    const authReady = useAuthGuard()
     const [data, setData] = useState<any[]>([])
     const [currentPrice, setCurrentPrice] = useState<number | null>(null)
+
+    if (!authReady) {
+        return <div className="w-full text-center py-24 text-white">Validating session…</div>
+    }
     const [pair, setPair] = useState('EUR/USD')
     const [lotSize, setLotSize] = useState('0.10')
     const [loading, setLoading] = useState(false)
