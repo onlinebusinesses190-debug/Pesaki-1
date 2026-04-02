@@ -32,10 +32,10 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
-    const supabase = createClient()
     const mode = (searchParams.get('mode') as 'real' | 'demo') || 'demo'
 
     const handleSignOut = async () => {
+        const supabase = createClient()
         await supabase.auth.signOut()
         router.push('/login')
         router.refresh()
