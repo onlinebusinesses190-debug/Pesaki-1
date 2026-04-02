@@ -195,7 +195,7 @@ export default function InvestmentPage() {
                     symbol: selectedStock.symbol,
                     direction: prediction,
                     amount: Number(stake),
-                    mode,
+                    mode: 'invest',
                     entryPrice: selectedStock.price
                 })
             })
