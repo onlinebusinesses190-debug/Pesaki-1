@@ -35,8 +35,14 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
     const mode = (searchParams.get('mode') as 'real' | 'demo') || 'demo'
 
     const handleSignOut = async () => {
-        const supabase = createClient()
-        await supabase.auth.signOut()
+        const res = await fetch('/api/auth/logout', { method: 'POST' })
+        const data = await res.json()
+
+        if (!res.ok || data.error) {
+            console.error('Logout failed', data.error)
+            return
+        }
+
         router.push('/login')
         router.refresh()
     }

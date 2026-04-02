@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -14,8 +13,6 @@ export default function LoginPage() {
     const router = useRouter()
 
     const handleAuth = async (e: React.FormEvent) => {
-        e.preventDefault()
-        const supabase = createClient()
         e.preventDefault()
         setLoading(true)
         setError(null)
@@ -32,44 +29,31 @@ export default function LoginPage() {
             return
         }
 
-        const loginEmail = `${input}@pesaki.com`
+        const endpoint = isSignUp ? '/api/auth/signup' : '/api/auth/login'
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: input, password }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok || result.error) {
+            setError(result.error || 'Authentication failed')
+            setLoading(false)
+            return
+        }
 
         if (isSignUp) {
-            const { error } = await supabase.auth.signUp({
-                email: loginEmail,
-                password: password,
-                options: {
-                    data: {
-                        display_identifier: input,
-                        auth_type: 'phone'
-                    }
-                }
-            })
-            if (error) {
-                setError(error.message)
-                setLoading(false)
-            } else {
-                setMessage("Account created! You can now log in.")
-                setIsSignUp(false)
-                setLoading(false)
-            }
-        } else {
-            console.log('Attempting sign in for:', loginEmail);
-            const { error, data } = await supabase.auth.signInWithPassword({
-                email: loginEmail,
-                password: password,
-            })
-
-            if (error) {
-                console.error('Sign in error:', error);
-                setError(error.message)
-                setLoading(false)
-            } else {
-                console.log('Sign in success! Redirecting to /dashboard', data);
-                router.push('/dashboard')
-                router.refresh()
-            }
+            setMessage('Account created! You can now log in.')
+            setIsSignUp(false)
+            setLoading(false)
+            return
         }
+
+        router.push('/dashboard')
+        router.refresh()
+
     }
 
     return (
