@@ -3,9 +3,10 @@ import { getWallet } from '@/app/actions/wallet'
 import Link from 'next/link'
 import { TrendingUp, Plane, Disc, Building2, ArrowUpRight, Wallet, History, Star } from 'lucide-react'
 
-export default async function DashboardHome({ searchParams }: { searchParams: { mode?: string } }) {
+export default async function DashboardHome({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
     const wallet = await getWallet()
-    const mode = searchParams.mode || 'demo'
+    const params = await searchParams;
+    const mode = params.mode || 'demo'
     const isDemo = mode === 'demo'
 
     const balance = wallet
@@ -14,9 +15,9 @@ export default async function DashboardHome({ searchParams }: { searchParams: { 
 
     const FEATURED_GAMES = [
         { name: 'Pesaki FX', icon: <TrendingUp />, href: '/dashboard/fx', color: 'bg-emerald-500', desc: 'Trade Forex pairs with high leverage.' },
-        { name: 'Aviator', icon: <Plane />, href: '/dashboard/aviator', color: 'bg-red-500', desc: 'Predict how far the plane flies.', underDevelopment: true },
-        { name: 'Up & Down', icon: <ArrowUpRight />, href: '/dashboard/up-down', color: 'bg-blue-500', desc: 'Simple market direction prediction.', underDevelopment: true },
-        { name: 'Spin Dogo', icon: <Disc />, href: '/dashboard/spin', color: 'bg-purple-500', desc: 'Spin the wheel to win instant prizes.', underDevelopment: true },
+        { name: 'AviMarket', icon: <Plane />, href: '/dashboard/aviator', color: 'bg-red-500', desc: 'Market-linked multiplier — predict how far the market flies.' },
+        { name: 'Up & Down', icon: <ArrowUpRight />, href: '/dashboard/up-down', color: 'bg-blue-500', desc: 'Simple market direction prediction.' },
+        { name: 'Market Spin', icon: <Disc />, href: '/dashboard/spin', color: 'bg-purple-500', desc: 'Spin the market wheel to win instant prizes.' },
         { name: 'Kenyan Market', icon: <Building2 />, href: '/dashboard/invest', color: 'bg-amber-500', desc: 'Daily predictions on NSE companies.' },
     ]
 
@@ -31,14 +32,18 @@ export default async function DashboardHome({ searchParams }: { searchParams: { 
                             Welcome back, Explorer!
                         </h1>
                         <p className="text-zinc-400">
-                            You're currently playing in <span className={`font-bold ${isDemo ? 'text-blue-400' : 'text-emerald-400'}`}>{isDemo ? 'DEMO' : 'REAL'}</span> mode.
+                            {isDemo ? (
+                                <>You're currently playing in <span className="font-bold text-blue-400">DEMO</span> mode.</>
+                            ) : (
+                                <>Access real-time markets and place your trades.</>
+                            )}
                         </p>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col items-center md:items-end">
                         <span className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1">Available Balance</span>
                         <div className="text-4xl font-black text-white flex items-center gap-2">
                             <span className="text-zinc-500 text-xl">KSh</span>
-                            {balance.toLocaleString()}
+                            {(balance ?? 0).toLocaleString()}
                         </div>
                     </div>
                 </div>
@@ -70,10 +75,10 @@ export default async function DashboardHome({ searchParams }: { searchParams: { 
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         Featured Games
                     </h2>
-                    <Link href="/dashboard" className="text-xs font-bold text-zinc-500 hover:text-white transition-colors">SEE ALL</Link>
+                    <Link href={`/dashboard?mode=${mode}`} className="text-xs font-bold text-zinc-500 hover:text-white transition-colors">SEE ALL</Link>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {FEATURED_GAMES.map((game, i) => {
                         const GameContent = (
                             <>
@@ -83,36 +88,20 @@ export default async function DashboardHome({ searchParams }: { searchParams: { 
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${game.color} shadow-lg shadow-${game.color.split('-')[1]}-500/20 group-hover:scale-110 transition-transform`}>
                                         {game.icon}
                                     </div>
-                                    {!game.underDevelopment && <ArrowUpRight className="text-zinc-700 group-hover:text-white transition-colors" size={20} />}
-                                    {game.underDevelopment && (
-                                        <div className="px-2 py-1 rounded-md bg-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-tight">
-                                            Coming Soon
-                                        </div>
-                                    )}
+                                    <ArrowUpRight className="text-zinc-700 group-hover:text-white transition-colors" size={20} />
                                 </div>
 
                                 <h3 className="text-xl font-bold text-white mb-1">{game.name}</h3>
                                 <p className="text-sm text-zinc-500 leading-relaxed">
-                                    {game.underDevelopment ? "We're currently perfecting this game for the best experience. Check back soon!" : game.desc}
+                                    {game.desc}
                                 </p>
                             </>
                         )
 
-                        if (game.underDevelopment) {
-                            return (
-                                <div
-                                    key={i}
-                                    className="group relative bg-card/20 border border-border/50 rounded-2xl p-6 grayscale cursor-not-allowed opacity-60 overflow-hidden"
-                                >
-                                    {GameContent}
-                                </div>
-                            )
-                        }
-
                         return (
                             <Link
                                 key={i}
-                                href={game.href}
+                                href={`${game.href}?mode=${mode}`}
                                 className="group relative bg-card/50 border border-border rounded-2xl p-6 hover:border-white/20 hover:bg-zinc-900 transition-all duration-300 overflow-hidden"
                             >
                                 {GameContent}
@@ -123,20 +112,40 @@ export default async function DashboardHome({ searchParams }: { searchParams: { 
             </div>
 
             {/* Footer Info */}
-            <div className="p-8 rounded-2xl bg-zinc-950 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full border-2 border-primary/30 flex items-center justify-center text-primary">
-                        <Wallet size={24} />
+            {isDemo ? (
+                <div className="p-8 rounded-2xl bg-zinc-950 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full border-2 border-accent/30 flex items-center justify-center text-accent">
+                            <Wallet size={24} />
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-white">Need more demo funds?</div>
+                            <div className="text-xs text-zinc-500">Demo accounts reset automatically every 24 hours.</div>
+                        </div>
                     </div>
-                    <div>
-                        <div className="text-sm font-bold text-white">Need more demo funds?</div>
-                        <div className="text-xs text-zinc-500">Demo accounts reset automatically every 24 hours.</div>
-                    </div>
+                    <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-all">
+                        REFRESH SESSION
+                    </button>
                 </div>
-                <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-all">
-                    REFRESH SESSION
-                </button>
-            </div>
+            ) : (
+                <div className="p-8 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-black border border-emerald-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full border-2 border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                            <Wallet size={24} />
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-white">Ready to play with real money?</div>
+                            <div className="text-xs text-zinc-400">Deposit instantly via M-Pesa. Minimum KSh 10.</div>
+                        </div>
+                    </div>
+                    <a
+                        href={`/dashboard/wallet?mode=real`}
+                        className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-black transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-95"
+                    >
+                        DEPOSIT VIA M-PESA
+                    </a>
+                </div>
+            )}
         </div>
     )
 }

@@ -2,83 +2,55 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plane, Coins, AlertCircle } from 'lucide-react'
+import { Plane, Coins, AlertCircle, Loader2 } from 'lucide-react'
+import { io, Socket } from 'socket.io-client'
+import { createClient } from '@/utils/supabase/client'
+import { apiRequest } from '@/utils/api'
+import { useSearchParams } from 'next/navigation'
+import { ModeToggle } from '@/components/dashboard/ModeToggle'
 
-type GameState = 'IDLE' | 'Flying' | 'CRASHED'
+type GameStatus = 'WAITING' | 'FLYING' | 'CRASHED'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function AviatorPage() {
-    const [gameState, setGameState] = useState<GameState>('IDLE')
+    const [status, setStatus] = useState<GameStatus>('WAITING')
     const [multiplier, setMultiplier] = useState(1.00)
-    const [crashPoint, setCrashPoint] = useState(0)
     const [betAmount, setBetAmount] = useState('100')
     const [cashedOut, setCashedOut] = useState(false)
     const [cashOutMultiplier, setCashOutMultiplier] = useState(0)
     const [history, setHistory] = useState<number[]>([])
+    const [isBetting, setIsBetting] = useState(false)
+    const [waitTime, setWaitTime] = useState(0)
+    const searchParams = useSearchParams()
+    const mode = (searchParams.get('mode') === 'real' ? 'real' : 'demo') as 'real' | 'demo'
 
-    // Animation Refs
-    const requestRef = useRef<number | null>(null)
-    const startTimeRef = useRef<number | null>(null)
+    const socketRef = useRef<Socket | null>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const multiplierRef = useRef(1.00)
 
     // Game Logic
-    const startGame = () => {
-        if (gameState === 'Flying') return
-
-        setCashedOut(false)
-        setMultiplier(1.00)
-        setGameState('Flying')
-
-        // Server generates crash point (Simulated)
-        // Crash point logic: heavily weighted towards lower numbers
-        const r = Math.random()
-        // Simple inverse distribution for demo
-        const generatedCrash = Math.max(1.00, (100 / (r * 100 + 1)) * (Math.random() * 5))
-        // Or simple: 1 / rand
-        // Let's use a simpler "Aviator-like" distribution mock
-        // Many crashes at 1.x
-        const crash = (0.99 / Math.random());
-        // console.log("Crash point:", crash)
-        setCrashPoint(crash)
-
-        startTimeRef.current = Date.now()
-        requestRef.current = requestAnimationFrame(animate)
-    }
-
-    const animate = () => {
-        if (!startTimeRef.current) return
-
-        const elapsed = Date.now() - startTimeRef.current
-        // Exponential growth helper
-        // current = 1.00 * e^(elapsed / speed)
-        const newMultiplier = 1.00 + Math.pow(elapsed / 1000, 2) * 0.1
-        // Simplified linear-ish visual for MVP, mostly exp later
-
-        const currentMult = 1 + (elapsed / 3000) + (Math.pow(elapsed, 2) / 10000000)
-
-        setMultiplier(currentMult)
-        drawCanvas(currentMult, false)
-
-        if (currentMult >= crashPoint) {
-            handleCrash(currentMult)
-        } else {
-            requestRef.current = requestAnimationFrame(animate)
+    const placeBet = async () => {
+        if (status !== 'WAITING' || isBetting) return
+        setIsBetting(true)
+        try {
+            await apiRequest('/games/aviator/bet', {
+                method: 'POST',
+                body: JSON.stringify({ amount: Number(betAmount), mode })
+            });
+        } catch (err: any) {
+            alert(err.message || 'Failed to place bet');
+            setIsBetting(false)
         }
     }
 
-    const handleCrash = (finalMult: number) => {
-        setGameState('CRASHED')
-        setMultiplier(finalMult)
-        drawCanvas(finalMult, true)
-        setHistory(prev => [parseFloat(finalMult.toFixed(2)), ...prev.slice(0, 19)])
-        cancelAnimationFrame(requestRef.current!)
+    const handleCashOut = () => {
+        if (status !== 'FLYING' || cashedOut || !socketRef.current) return
+        socketRef.current.emit('CASHOUT');
     }
 
-    const handleCashOut = () => {
-        if (gameState !== 'Flying' || cashedOut) return
-        setCashedOut(true)
-        setCashOutMultiplier(multiplier)
-        // Trigger WIN transaction here
-    }
+    // Add a state for particles to create a beautiful trail
+    const [particles, setParticles] = useState<{ x: number, y: number, life: number }[]>([])
 
     // Canvas Drawing
     const drawCanvas = (currentMult: number, isCrashed: boolean) => {
@@ -90,76 +62,185 @@ export default function AviatorPage() {
         const width = canvas.width
         const height = canvas.height
 
-        // Clear
+        // Clear with a slight fade effect for trail persistence if desired, 
+        // but for now let's just clear fully and draw our own particles.
         ctx.clearRect(0, 0, width, height)
 
-        // Draw Curve
+        // Draw Grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
+        ctx.lineWidth = 1
+        for (let i = 0; i < width; i += 50) {
+            ctx.beginPath()
+            ctx.moveTo(i, 0)
+            ctx.lineTo(i, height)
+            ctx.stroke()
+        }
+        for (let i = 0; i < height; i += 50) {
+            ctx.beginPath()
+            ctx.moveTo(0, i)
+            ctx.lineTo(width, i)
+            ctx.stroke()
+        }
+
+        // Calculate Position
+        // Path grows exponentially: x starts slow and speeds up, y starts low and goes high
+        const progress = Math.min(1, (currentMult - 1) / 10) // Normalize roughly for first 10x
+        const px = 50 + (width - 100) * (1 - Math.pow(1 - progress, 2)) // Ease out x
+        const py = height - 50 - (height - 100) * Math.pow(progress, 1.5) // Ease in y
+
+        // Draw Flight Path (Curve)
         ctx.beginPath()
-        ctx.moveTo(0, height)
-
-        // Simple Bezier approximation of flight
-        // X moves with time (0 to width)
-        // Y moves with multiplier height
-
-        // Map 1.00 -> X:0, Y:height
-        // Map Crash -> X:width, Y:0
-
-        // For visual loop: The plane stays somewhat centered or moves up-right
-        const x = (Date.now() - (startTimeRef.current || 0)) / 50 // simplistic x movement
-        const y = height - (Math.min(height, (currentMult - 1) * 100))
-
-        // Draw Plane
-        ctx.fillStyle = isCrashed ? '#ef4444' : '#ef5350' // Red
-        ctx.beginPath()
-
-        // Drawing a simple plane shape or line
-        const px = Math.min(width - 50, 50 + x % (width - 100))
-        const py = Math.max(50, height - ((currentMult - 1) * 150))
-
-        // Curve trace
-        ctx.lineWidth = 4
         ctx.strokeStyle = '#ef4444'
-        ctx.beginPath()
-        // This is tricky without history of points. 
-        // For MVP, just draw the plane at current position
+        ctx.lineWidth = 3
+        ctx.lineJoin = 'round'
+        ctx.moveTo(50, height - 50)
+        
+        // Use quadratic curve for smoothness
+        const cpX = px * 0.5 + 25
+        const cpY = height - 50
+        ctx.quadraticCurveTo(cpX, cpY, px, py)
+        
+        // Add a glowing gradient to the line
+        const grad = ctx.createLinearGradient(50, height - 50, px, py)
+        grad.addColorStop(0, 'rgba(239, 68, 68, 0)')
+        grad.addColorStop(1, '#ef4444')
+        ctx.strokeStyle = grad
+        ctx.stroke()
 
-        // Draw Plane Body (Triangle)
+        // Draw Particles (The Trail)
+        if (status === 'FLYING') {
+            setParticles(prev => [
+                { x: px, y: py, life: 1.0 },
+                ...prev.map(p => ({ ...p, life: p.life - 0.05 })).filter(p => p.life > 0)
+            ].slice(0, 30))
+        }
+
+        particles.forEach(p => {
+            ctx.beginPath()
+            ctx.fillStyle = `rgba(239, 68, 68, ${p.life * 0.5})`
+            ctx.arc(p.x, p.y, 2 * p.life, 0, Math.PI * 2)
+            ctx.fill()
+        })
+
+        // Draw The Plane (Red Arrow Redesign)
         ctx.save()
         ctx.translate(px, py)
-        // Check angle 
-        ctx.rotate(-20 * Math.PI / 180)
+        
+        // Calculate rotation based on trajectory
+        const angle = Math.atan2(py - (height - 50), px - 50)
+        ctx.rotate(angle)
 
+        if (isCrashed) {
+            ctx.scale(1.2, 1.2)
+            ctx.shadowBlur = 20
+            ctx.shadowColor = '#ef4444'
+        }
+
+        // Sleek Plane Shape
         ctx.beginPath()
         ctx.fillStyle = '#ef4444'
-        ctx.moveTo(10, 0)
-        ctx.lineTo(-20, 10)
-        ctx.lineTo(-20, -10)
+        
+        // Body
+        ctx.moveTo(15, 0)
+        ctx.lineTo(-15, -8)
+        ctx.lineTo(-10, 0)
+        ctx.lineTo(-15, 8)
+        ctx.closePath()
+        ctx.fill()
+
+        // Wing
+        ctx.beginPath()
+        ctx.fillStyle = '#b91c1c' // Darker red for depth
+        ctx.moveTo(-5, 0)
+        ctx.lineTo(-12, -15)
+        ctx.lineTo(-2, -15)
+        ctx.lineTo(5, 0)
+        ctx.closePath()
         ctx.fill()
 
         ctx.restore()
 
         if (isCrashed) {
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'
+            ctx.fillRect(0, 0, width, height)
+            
             ctx.fillStyle = 'white'
-            ctx.font = 'bold 20px sans-serif'
-            ctx.fillText("CRASHED", width / 2 - 40, height / 2)
+            ctx.font = '900 48px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText("FLEW AWAY!", width / 2, height / 2)
         }
     }
 
     useEffect(() => {
-        // Initial Draw
+        const supabase = createClient();
+        
+        const initGame = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const socket = io(`${API_URL}/aviator`, {
+                auth: { token: session.access_token }
+            });
+
+            socketRef.current = socket;
+
+            socket.on('ROUND_WAITING', (data) => {
+                setStatus('WAITING');
+                setMultiplier(1.00);
+                multiplierRef.current = 1.00;
+                setWaitTime(data.waitTime / 1000);
+                setCashedOut(false);
+                setIsBetting(false);
+                drawCanvas(1.00, false);
+            });
+
+            socket.on('ROUND_START', () => {
+                setStatus('FLYING');
+                setWaitTime(0);
+            });
+
+            socket.on('MULTIPLIER_TICK', (data) => {
+                const newMult = parseFloat(data.multiplier);
+                setMultiplier(newMult);
+                multiplierRef.current = newMult;
+                drawCanvas(newMult, false);
+            });
+
+            socket.on('ROUND_CRASHED', (data) => {
+                setStatus('CRASHED');
+                const finalMult = parseFloat(data.multiplier);
+                setMultiplier(finalMult);
+                multiplierRef.current = finalMult;
+                setHistory(prev => [finalMult, ...prev.slice(0, 19)]);
+                drawCanvas(finalMult, true);
+            });
+
+            socket.on('CASHED_OUT', (data) => {
+                setCashedOut(true);
+                setCashOutMultiplier(data.multiplier);
+            });
+
+            socket.on('error', (err) => console.error('Socket error:', err));
+        }
+
+        initGame();
+
         const canvas = canvasRef.current
         if (canvas) {
             canvas.width = canvas.parentElement?.clientWidth || 800
             canvas.height = 400
         }
-        return () => cancelAnimationFrame(requestRef.current!)
+
+        return () => {
+            socketRef.current?.disconnect();
+        }
     }, [])
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <Plane className="text-red-500" /> Aviator
+                    <Plane className={`text-red-500 ${status === 'FLYING' ? 'animate-pulse' : ''}`} /> AviMarket
                 </h1>
                 <div className="flex gap-2 text-sm overflow-x-auto max-w-[500px]">
                     {history.map((m, i) => (
@@ -171,15 +252,16 @@ export default function AviatorPage() {
                 </div>
             </div>
 
+            <ModeToggle />
+
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3 bg-card border border-border rounded-2xl relative overflow-hidden h-[500px] flex flex-col">
-                    {/* Multiplier Centered */}
                     <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <div className={`text-8xl font-black tracking-tighter transition-all ${gameState === 'CRASHED' ? 'text-red-600 scale-110' : 'text-white'
+                        <div className={`text-8xl font-black tracking-tighter transition-all ${status === 'CRASHED' ? 'text-red-600 scale-110' : 'text-white'
                             }`}>
                             {multiplier.toFixed(2)}x
                         </div>
-                        {gameState === 'CRASHED' && (
+                        {status === 'CRASHED' && (
                             <div className="absolute top-[60%] text-red-500 font-bold text-xl animate-bounce">
                                 FLEW AWAY!
                             </div>
@@ -192,14 +274,16 @@ export default function AviatorPage() {
                     </div>
 
                     <canvas ref={canvasRef} className="w-full h-full bg-black/50" />
-
-                    {/* Background Grid/Stars can be CSS */}
                 </div>
 
                 <div className="bg-card border border-border rounded-xl p-6 flex flex-col gap-6">
                     <div className="bg-white/5 rounded-xl p-4 text-center">
-                        <div className="text-muted-foreground text-sm uppercase mb-1">Next Round In</div>
-                        <div className="text-xl font-bold text-white">Ready</div>
+                        <div className="text-muted-foreground text-sm uppercase mb-1">
+                            {status === 'WAITING' ? 'Next Round In' : 'Round Progress'}
+                        </div>
+                        <div className="text-xl font-bold text-white">
+                            {status === 'WAITING' ? `${waitTime}s` : status}
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -213,15 +297,10 @@ export default function AviatorPage() {
                             />
                             <button onClick={() => setBetAmount(String(parseInt(betAmount) + 10))} className="p-2 border border-white/10 rounded-lg hover:bg-white/5">+</button>
                         </div>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['100', '200', '500', '1000'].map(v => (
-                                <button key={v} onClick={() => setBetAmount(v)} className="text-xs py-1 bg-white/5 rounded hover:bg-white/10">{v}</button>
-                            ))}
-                        </div>
                     </div>
 
                     <div className="mt-auto">
-                        {gameState === 'Flying' && !cashedOut ? (
+                        {status === 'FLYING' && !cashedOut && isBetting ? (
                             <button
                                 onClick={handleCashOut}
                                 className="w-full h-20 bg-orange-500 hover:bg-orange-400 text-black font-black text-2xl rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all active:scale-95 flex flex-col items-center justify-center p-1"
@@ -233,11 +312,11 @@ export default function AviatorPage() {
                             </button>
                         ) : (
                             <button
-                                onClick={startGame}
-                                disabled={gameState === 'Flying'}
-                                className="w-full h-20 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-2xl rounded-xl shadow-[0_0_30px_rgba(22,163,74,0.4)] transition-all active:scale-95 border-b-4 border-green-800"
+                                onClick={placeBet}
+                                disabled={status !== 'WAITING' || isBetting}
+                                className="w-full h-20 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-2xl rounded-xl shadow-[0_0_30px_rgba(22,163,74,0.4)] transition-all active:scale-95 border-b-4 border-green-800 flex items-center justify-center gap-2"
                             >
-                                BET
+                                {isBetting ? <Loader2 className="animate-spin" /> : 'BET'}
                             </button>
                         )}
                     </div>

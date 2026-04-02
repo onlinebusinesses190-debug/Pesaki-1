@@ -7,6 +7,8 @@ import {
     ArrowUp, ArrowDown, Search,
     RefreshCw, CircleDot, AlertCircle, Wifi, WifiOff,
 } from 'lucide-react'
+import { apiRequest } from '@/utils/api'
+import { toast } from 'sonner'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +145,7 @@ export default function InvestmentPage() {
     const [selectedStock, setSelectedStock] = useState<NseStock | null>(null)
     const [prediction, setPrediction] = useState<'HIGH' | 'LOW' | null>(null)
     const [stake, setStake] = useState('1000')
+    const [isPlacing, setIsPlacing] = useState(false)
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
     const fetchStocks = useCallback(async (isRefresh = false) => {
@@ -181,11 +184,30 @@ export default function InvestmentPage() {
         s.sector.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
-    const handlePlacePrediction = () => {
+    const handlePlacePrediction = async () => {
         if (!selectedStock || !prediction) return
-        alert(`✅ Prediction placed!\n${selectedStock.name} (${selectedStock.symbol}) → ${prediction}\nStake: KES ${stake}\n\nResults declared at market close.`)
-        setSelectedStock(null)
-        setPrediction(null)
+        setIsPlacing(true)
+        
+        try {
+            await apiRequest('/games/nse/predict', {
+                method: 'POST',
+                body: JSON.stringify({
+                    symbol: selectedStock.symbol,
+                    direction: prediction,
+                    amount: Number(stake),
+                    mode,
+                    entryPrice: selectedStock.price
+                })
+            })
+            
+            toast.success(`Prediction placed for ${selectedStock.symbol}!`)
+            setSelectedStock(null)
+            setPrediction(null)
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to place prediction')
+        } finally {
+            setIsPlacing(false)
+        }
     }
 
     const formattedTime = updatedAt
@@ -409,10 +431,10 @@ export default function InvestmentPage() {
                                 <button
                                     id="place-prediction-btn"
                                     onClick={handlePlacePrediction}
-                                    disabled={!prediction || Number(stake) < 10}
+                                    disabled={!prediction || Number(stake) < 10 || isPlacing}
                                     className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                                 >
-                                    PLACE PREDICTION →
+                                    {isPlacing ? 'PLACING...' : 'PLACE PREDICTION →'}
                                 </button>
 
                                 <p className="text-[11px] text-center text-muted-foreground leading-relaxed">

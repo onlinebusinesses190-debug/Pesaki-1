@@ -2,51 +2,56 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import { ArrowUp, ArrowDown, Clock, Trophy, History } from 'lucide-react'
+import { ArrowUp, ArrowDown, Clock, Trophy, History, Loader2 } from 'lucide-react'
+import { apiRequest } from '@/utils/api'
+import { useSearchParams } from 'next/navigation'
+import { ModeToggle } from '@/components/dashboard/ModeToggle'
 
 type GameState = 'OPEN' | 'LOCKED' | 'RESULT'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export default function UpDownGame() {
     const [gameState, setGameState] = useState<GameState>('OPEN')
-    const [timeLeft, setTimeLeft] = useState(300) // 5 minutes in seconds
-    const [price, setPrice] = useState(100.00)
-    const [startPrice, setStartPrice] = useState(100.00)
+    const [timeLeft, setTimeLeft] = useState(300) 
+    const [price, setPrice] = useState(1.0850)
+    const [startPrice, setStartPrice] = useState(1.0850)
     const [selectedDirection, setSelectedDirection] = useState<'UP' | 'DOWN' | null>(null)
     const [stake, setStake] = useState('100')
     const [history, setHistory] = useState<{ result: 'UP' | 'DOWN', time: string, price: number }[]>([])
+    const searchParams = useSearchParams()
+    const mode = (searchParams.get('mode') === 'real' ? 'real' : 'demo') as 'real' | 'demo'
+    const [isBetting, setIsBetting] = useState(false)
 
-    // Game Loop Simulation
+    // Fetch Price
+    useEffect(() => {
+        const fetchPrice = async () => {
+            try {
+                const res = await fetch(`${API_URL}/market/price?pair=EUR/USD`);
+                const data = await res.json();
+                if (data.price) {
+                    setPrice(data.price);
+                }
+            } catch (e) {
+                console.error('Price fetch failed');
+            }
+        };
+
+        const interval = setInterval(fetchPrice, 5000);
+        fetchPrice();
+        return () => clearInterval(interval);
+    }, []);
+
+    // Game Loop Timer (UI Only)
     useEffect(() => {
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
-                if (prev <= 0) {
-                    // Transition Logic
-                    if (gameState === 'OPEN') {
-                        setGameState('LOCKED')
-                        setStartPrice(price)
-                        return 5 // 5 seconds result phase
-                    } else if (gameState === 'LOCKED') {
-                        setGameState('RESULT')
-                        // Determine Winner
-                        const finalResult = price >= startPrice ? 'UP' : 'DOWN'
-                        setHistory(prevHist => [{ result: finalResult, time: new Date().toLocaleTimeString(), price }, ...prevHist.slice(0, 9)])
-                        return 5 // Show result for 5 seconds
-                    } else {
-                        setGameState('OPEN')
-                        setSelectedDirection(null)
-                        return 300 // Reset to 5 mins
-                    }
-                }
-                return prev - 1
-            })
-
-            // Simulate Price Movement
-            setPrice(p => p + (Math.random() - 0.5))
-
+                if (prev <= 0) return 300;
+                return prev - 1;
+            });
         }, 1000)
-
         return () => clearInterval(timer)
-    }, [gameState, price, startPrice])
+    }, [])
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60)
@@ -54,9 +59,26 @@ export default function UpDownGame() {
         return `${m}:${s.toString().padStart(2, '0')}`
     }
 
-    const handleBet = (direction: 'UP' | 'DOWN') => {
-        if (gameState !== 'OPEN') return
-        setSelectedDirection(direction)
+    const handleBet = async (direction: 'UP' | 'DOWN') => {
+        if (gameState !== 'OPEN' || isBetting) return
+        setIsBetting(true);
+        try {
+            await apiRequest('/games/prediction/place', {
+                method: 'POST',
+                body: JSON.stringify({
+                    amount: Number(stake),
+                    mode,
+                    market: 'EUR/USD',
+                    direction,
+                    windowMinutes: 5
+                })
+            });
+            setSelectedDirection(direction)
+        } catch (err: any) {
+            alert(err.message || 'Failed to place prediction');
+        } finally {
+            setIsBetting(false);
+        }
     }
 
     return (
@@ -70,14 +92,11 @@ export default function UpDownGame() {
                 </div>
 
                 <div className="flex items-center gap-4 bg-card/50 p-3 rounded-xl border border-white/5">
-                    <div className={`flex flex-col items-center px-4 ${gameState === 'OPEN' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                        <span className="text-xs uppercase font-bold tracking-wider">Status</span>
-                        <span className="font-bold">{gameState}</span>
-                    </div>
+                    <ModeToggle />
                     <div className="w-px h-8 bg-white/10" />
                     <div className="flex flex-col items-center px-4">
                         <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Timer</span>
-                        <span className={`text-2xl font-mono font-bold ${timeLeft < 10 && gameState === 'OPEN' ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                        <span className={`text-2xl font-mono font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
                             {formatTime(timeLeft)}
                         </span>
                     </div>
@@ -91,46 +110,42 @@ export default function UpDownGame() {
                     {/* Price Display */}
                     <div className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center justify-center relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent opacity-20" />
-                        <h3 className="text-muted-foreground uppercase text-sm font-medium mb-2">Current Asset Price</h3>
+                        <h3 className="text-muted-foreground uppercase text-sm font-medium mb-2">EUR/USD Price</h3>
                         <div className="text-6xl font-black text-white tracking-tighter flex items-center gap-2">
-                            {price.toFixed(2)}
+                            {price.toFixed(4)}
                             {price > startPrice ? (
                                 <ArrowUp className="text-emerald-500" size={32} />
                             ) : (
                                 <ArrowDown className="text-red-500" size={32} />
                             )}
                         </div>
-                        {gameState === 'LOCKED' && (
-                            <div className="mt-4 px-4 py-1 bg-yellow-500/10 text-yellow-500 rounded-full text-sm border border-yellow-500/20">
-                                Locked @ {startPrice.toFixed(2)}
-                            </div>
-                        )}
+                        <div className="mt-4 text-xs font-mono text-muted-foreground uppercase tracking-widest opacity-50">Live Market Feed</div>
                     </div>
 
                     {/* Betting Controls */}
                     <div className="grid grid-cols-2 gap-4">
                         <button
                             onClick={() => handleBet('UP')}
-                            disabled={gameState !== 'OPEN'}
+                            disabled={gameState !== 'OPEN' || isBetting}
                             className={`h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${selectedDirection === 'UP'
                                 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]'
                                 : 'bg-card border-border hover:border-emerald-500/50 hover:bg-emerald-500/5 text-muted-foreground hover:text-emerald-400'
-                                } ${gameState !== 'OPEN' ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                                } ${gameState !== 'OPEN' || isBetting ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
                         >
-                            <ArrowUp size={48} strokeWidth={3} />
+                            {isBetting && selectedDirection === 'UP' ? <Loader2 className="animate-spin" /> : <ArrowUp size={48} strokeWidth={3} />}
                             <span className="text-2xl font-bold">UP</span>
                             {selectedDirection === 'UP' && <span className="text-xs bg-emerald-500 text-black px-2 py-0.5 rounded-full font-bold">SELECTED</span>}
                         </button>
 
                         <button
                             onClick={() => handleBet('DOWN')}
-                            disabled={gameState !== 'OPEN'}
+                            disabled={gameState !== 'OPEN' || isBetting}
                             className={`h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${selectedDirection === 'DOWN'
                                 ? 'bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.2)]'
                                 : 'bg-card border-border hover:border-red-500/50 hover:bg-red-500/5 text-muted-foreground hover:text-red-400'
-                                } ${gameState !== 'OPEN' ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                                } ${gameState !== 'OPEN' || isBetting ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
                         >
-                            <ArrowDown size={48} strokeWidth={3} />
+                            {isBetting && selectedDirection === 'DOWN' ? <Loader2 className="animate-spin" /> : <ArrowDown size={48} strokeWidth={3} />}
                             <span className="text-2xl font-bold">DOWN</span>
                             {selectedDirection === 'DOWN' && <span className="text-xs bg-red-500 text-black px-2 py-0.5 rounded-full font-bold">SELECTED</span>}
                         </button>

@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-    const [identifier, setIdentifier] = useState('') // Can be email or phone
+    const [identifier, setIdentifier] = useState('') // Phone number
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [isSignUp, setIsSignUp] = useState(false)
@@ -20,16 +20,18 @@ export default function LoginPage() {
         setError(null)
         setMessage(null)
 
-        const input = identifier.trim()
-        let loginEmail = input
-
-        // Logic to determine if user entered a phone number or email
-        const isEmail = input.includes('@')
-
-        if (!isEmail) {
-            // Treat as phone number -> map to virtual email
-            loginEmail = `${input}@pesaki.com`
+        // Remove spaces and non-digit characters if we were to enforce it strictly.
+        // For now, strip whitespaces.
+        const input = identifier.replace(/\s+/g, '')
+        
+        // Basic frontend validation for phone numbers
+        if (!/^[+]?[0-9]{9,15}$/.test(input)) {
+            setError("Please enter a valid mobile number")
+            setLoading(false)
+            return
         }
+
+        const loginEmail = `${input}@pesaki.com`
 
         if (isSignUp) {
             const { error } = await supabase.auth.signUp({
@@ -38,7 +40,7 @@ export default function LoginPage() {
                 options: {
                     data: {
                         display_identifier: input,
-                        auth_type: isEmail ? 'email' : 'phone'
+                        auth_type: 'phone'
                     }
                 }
             })
@@ -51,16 +53,19 @@ export default function LoginPage() {
                 setLoading(false)
             }
         } else {
-            const { error } = await supabase.auth.signInWithPassword({
+            console.log('Attempting sign in for:', loginEmail);
+            const { error, data } = await supabase.auth.signInWithPassword({
                 email: loginEmail,
                 password: password,
             })
 
             if (error) {
+                console.error('Sign in error:', error);
                 setError(error.message)
                 setLoading(false)
             } else {
-                router.push('/')
+                console.log('Sign in success! Redirecting to /dashboard', data);
+                router.push('/dashboard')
                 router.refresh()
             }
         }
@@ -84,12 +89,12 @@ export default function LoginPage() {
                 <form onSubmit={handleAuth} className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-sm font-medium leading-none text-foreground/80" htmlFor="identifier">
-                            Email or Mobile Number
+                            Mobile Number
                         </label>
                         <input
                             id="identifier"
-                            type="text"
-                            placeholder="e.g. 07123... or name@example.com"
+                            type="tel"
+                            placeholder="e.g. 0712345678"
                             className="flex h-12 w-full rounded-lg border border-white/10 bg-black/40 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
                             value={identifier}
                             onChange={(e) => setIdentifier(e.target.value)}
@@ -141,7 +146,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10 text-[10px] text-muted-foreground text-center">
-                    Mobile numbers are currently processed via virtual email mapping.
+                        All accounts are secured exclusively via Mobile Number.
                 </div>
             </div>
         </div>

@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
 import {
     Home,
     Wallet,
@@ -12,27 +13,15 @@ import {
     TrendingUp,
     Settings,
     LogOut,
-    X
+    X,
+    Menu as MenuIcon,
+    ShieldCheck,
+    Coins
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { WalletState } from '@/app/actions/wallet'
 
 export default function Sidebar({ wallet }: { wallet: WalletState | null }) {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false) // This state needs to be lifted or managed if triggered from header
-    // Actually, header is in layout. For simplicity in this refactor, I'll export a toggle context or just keep mobile menu simple for now. 
-    // Let's rely on a Prop or Context? For now, let's keep the mobile toggle separate or assume this component controls itself.
-    // Wait, the mobile toggle button was in the Header (main content area).
-    // To keep it clean without complex context, I'll include the Mobile Overlay and Sidebar in this component.
-    // The header button will need to communicate.
-    // Let's implement a simple Client wrapper for the whole Dashboard Shell if needed, or just let the Sidebar handle the "Sidebar" part and the Header handle the trigger.
-    // Standard pattern: Layout (Server) -> ClientShell (Client) -> Sidebar + Header + Children.
-
-    // Revised approach: DashboardShell.tsx (Client) which contains Sidebar and Header.
-
-    // However, I want to keep it simple. Let's make Sidebar accept 'isOpen' prop if controlled, or just managed internally if we only had the button here. 
-    // The button is in the header.
-
-    // Let's use a DashboardShell approach for state.
     return (
         <DashboardShell wallet={wallet} />
     )
@@ -42,9 +31,16 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const supabase = createClient()
     const mode = (searchParams.get('mode') as 'real' | 'demo') || 'demo'
 
-    // Derived state for display
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+        router.refresh()
+    }
+
     const balance = wallet
         ? (mode === 'real' ? wallet.balance : wallet.demo_balance)
         : (mode === 'demo' ? 10000 : 0)
@@ -55,9 +51,9 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
         { name: 'Dashboard', href: '/dashboard', icon: Home },
         { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
         { name: 'Pesaki FX', href: '/dashboard/fx', icon: LineChart },
-        { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp, underDevelopment: true },
-        { name: 'Aviator', href: '/dashboard/aviator', icon: Plane, underDevelopment: true },
-        { name: 'Spin Dogo', href: '/dashboard/spin', icon: Disc, underDevelopment: true },
+        { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp },
+        { name: 'AviMarket', href: '/dashboard/aviator', icon: Plane },
+        { name: 'Market Spin', href: '/dashboard/spin', icon: Disc },
         { name: 'Invest', href: '/dashboard/invest', icon: Gamepad2 },
     ]
 
@@ -77,7 +73,6 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
                     }`}
             >
                 <div className="h-full flex flex-col">
-                    {/* Logo Area */}
                     <div className="h-16 flex items-center px-6 border-b border-white/5">
                         <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                             PESAKI
@@ -90,7 +85,6 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
                         </button>
                     </div>
 
-                    {/* Mode Indicator */}
                     <div className="p-4">
                         <div className={`rounded-xl p-4 border ${mode === 'real'
                                 ? 'bg-primary/10 border-primary/20'
@@ -106,31 +100,15 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
                                     }`} />
                             </div>
                             <div className="mt-2 text-sm font-medium text-white">
-                                KSh {balance.toLocaleString()}
+                                KSh {(balance ?? 0).toLocaleString()}
                             </div>
                         </div>
                     </div>
 
-                    {/* Navigation */}
                     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                         {navItems.map((item) => {
                             const isActive = pathname === item.href
                             const Icon = item.icon
-
-                            if (item.underDevelopment) {
-                                return (
-                                    <div
-                                        key={item.href}
-                                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/50 cursor-not-allowed"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <Icon size={20} />
-                                            {item.name}
-                                        </div>
-                                        <span className="text-[10px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded font-bold uppercase">SOON</span>
-                                    </div>
-                                )
-                            }
 
                             return (
                                 <Link
@@ -148,27 +126,21 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
                         })}
                     </nav>
 
-                    {/* User Profile & Settings */}
                     <div className="p-4 border-t border-white/5 space-y-2">
-                        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 transition-all">
+                        <Link href={`/dashboard/settings?mode=${mode}`} className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${pathname === '/dashboard/settings'
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                            }`}>
                             <Settings size={20} />
                             Settings
-                        </button>
-                        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                        </Link>
+                        <button onClick={handleSignOut} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-all">
                             <LogOut size={20} />
                             Sign Out
                         </button>
                     </div>
                 </div>
             </aside>
-
-            {/* Mobile Header Trigger (Injected via Portal or accessed via props? - Complex.
-             Simplest: Just render the toggle button HERE in the main flow if we controlled the Main section too.
-             But layout.tsx wraps the children.
-             
-             Let's export the Header as well or consume children here?
-             YES. This component will be the Layout Shell.
-         */}
         </>
     )
 }
@@ -185,9 +157,7 @@ export function SidebarShell({ children, wallet }: { children: React.ReactNode, 
                 toggleSidebar={toggleSidebar}
             />
 
-            {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Mobile Header */}
                 <header className="h-16 lg:hidden flex items-center justify-between px-4 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-30">
                     <button
                         onClick={toggleSidebar}
@@ -199,7 +169,6 @@ export function SidebarShell({ children, wallet }: { children: React.ReactNode, 
                     <div className="w-6" />
                 </header>
 
-                {/* Page Content */}
                 <div className="flex-1 overflow-auto p-4 lg:p-8">
                     <div className="max-w-7xl mx-auto">
                         {children}
@@ -210,31 +179,56 @@ export function SidebarShell({ children, wallet }: { children: React.ReactNode, 
     )
 }
 
-import { Menu as MenuIcon } from 'lucide-react'
-
-// Internal Sidebar Content Component to reuse logic
 function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const supabase = createClient()
     const mode = (searchParams.get('mode') as 'real' | 'demo') || 'demo'
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+        router.refresh()
+    }
 
     const balance = wallet
         ? (mode === 'real' ? wallet.balance : wallet.demo_balance)
         : (mode === 'demo' ? 10000 : 0)
 
+    const [role, setRole] = useState<string | null>(null)
+
+    useEffect(() => {
+        const fetchRole = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single()
+                if (profile) setRole(profile.role)
+            }
+        }
+        fetchRole()
+    }, [])
+
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Home },
         { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
         { name: 'Pesaki FX', href: '/dashboard/fx', icon: LineChart },
-        { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp, underDevelopment: true },
-        { name: 'Aviator', href: '/dashboard/aviator', icon: Plane, underDevelopment: true },
-        { name: 'Spin Dogo', href: '/dashboard/spin', icon: Disc, underDevelopment: true },
+        { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp },
+        { name: 'AviMarket', href: '/dashboard/aviator', icon: Plane },
+        { name: 'Market Spin', href: '/dashboard/spin', icon: Disc },
         { name: 'Invest', href: '/dashboard/invest', icon: Gamepad2 },
     ]
 
+    if (role === 'admin') {
+        navItems.push({ name: 'Admin Oversight', href: '/dashboard/admin', icon: ShieldCheck })
+    }
+
     return (
         <>
-            {/* Mobile Overlay */}
             {isSidebarOpen && (
                 <div
                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
@@ -274,7 +268,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
                                     }`} />
                             </div>
                             <div className="mt-2 text-sm font-medium text-white">
-                                KSh {balance.toLocaleString()}
+                                KSh {(balance ?? 0).toLocaleString()}
                             </div>
                         </div>
                     </div>
@@ -283,21 +277,6 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
                         {navItems.map((item) => {
                             const isActive = pathname === item.href
                             const Icon = item.icon
-
-                            if (item.underDevelopment) {
-                                return (
-                                    <div
-                                        key={item.href}
-                                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground/50 cursor-not-allowed"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <Icon size={20} />
-                                            {item.name}
-                                        </div>
-                                        <span className="text-[10px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded font-bold uppercase">SOON</span>
-                                    </div>
-                                )
-                            }
 
                             return (
                                 <Link
@@ -316,11 +295,14 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
                     </nav>
 
                     <div className="p-4 border-t border-white/5 space-y-2">
-                        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 transition-all">
+                        <Link href={`/dashboard/settings?mode=${mode}`} className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${pathname === '/dashboard/settings'
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                            }`}>
                             <Settings size={20} />
                             Settings
-                        </button>
-                        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                        </Link>
+                        <button onClick={handleSignOut} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-all">
                             <LogOut size={20} />
                             Sign Out
                         </button>

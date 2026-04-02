@@ -4,8 +4,10 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useCallback } from 'react'
 import { TradingChart } from '@/components/fx/TradingChart'
 import { ArrowUp, ArrowDown, Activity, RefreshCw } from 'lucide-react'
-import { processTransaction } from '@/app/actions/wallet'
+import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 // Helper to generate initial chart data (remains mock for visual history)
 const generateData = (count: number, basePrice: number) => {
@@ -38,7 +40,7 @@ export default function FXPage() {
     const fetchPrice = useCallback(async (isInitial = false) => {
         try {
             if (isInitial) setLoading(true)
-            const res = await fetch(`/api/fx?pair=${encodeURIComponent(pair)}`)
+            const res = await fetch(`${API_URL}/market/price?pair=${pair}`)
             if (!res.ok) throw new Error('API Error')
             const result = await res.json()
 
@@ -74,27 +76,31 @@ export default function FXPage() {
         return () => clearInterval(interval)
     }, [fetchPrice])
 
-    const handleTrade = async (type: 'buy' | 'sell') => {
+    const handleTrade = async (direction: 'buy' | 'sell') => {
         if (!currentPrice) return
         setLoading(true)
 
-        // Calculate stake based on lot size (simplified KSh conversion for demo)
-        // 1 Lot = 100,000 units. Here we use a simpler model: lot size * 10,000 KSh
-        const stakeAmount = parseFloat(lotSize) * 10000
+        try {
+            const amount = parseFloat(lotSize) * 1000 // Simplified KSh conversion
+            const res = await apiRequest('/games/prediction/place', {
+                method: 'POST',
+                body: JSON.stringify({
+                    amount,
+                    mode,
+                    market: pair,
+                    direction: direction === 'buy' ? 'UP' : 'DOWN',
+                    windowMinutes: 5 // Default window
+                })
+            });
 
-        const result = await processTransaction(
-            stakeAmount,
-            'bet',
-            mode as 'real' | 'demo',
-            `FX:${pair}:${type.toUpperCase()}`
-        )
-
-        if ('error' in result) {
-            alert(`Error: ${result.error}`)
-        } else {
-            alert(`✅ ${type.toUpperCase()} position opened at ${currentPrice.toFixed(4)}\nStake: KSh ${stakeAmount.toLocaleString()}`)
+            if (res.success) {
+                alert(`✅ ${direction.toUpperCase()} position opened at ${currentPrice.toFixed(4)}\nStake: KSh ${amount.toLocaleString()}`)
+            }
+        } catch (err: any) {
+            alert(`Error: ${err.message}`)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     return (
