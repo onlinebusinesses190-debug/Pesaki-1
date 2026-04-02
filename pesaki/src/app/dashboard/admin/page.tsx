@@ -17,6 +17,8 @@ import {
 import { apiRequest } from '@/utils/api'
 import { toast } from 'sonner'
 
+export const dynamic = 'force-dynamic'
+
 interface AdminStats {
     totalDeposits: number
     totalWithdrawals: number
