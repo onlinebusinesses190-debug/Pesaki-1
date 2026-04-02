@@ -10,6 +10,11 @@ export const marketRoutes = async (fastify: FastifyInstance) => {
     const price = await redis.get(`market:${pair}`);
     if (!price) return reply.code(404).send({ error: 'Price not found' });
 
-    return reply.send({ price: parseFloat(price) });
+    const parsedPrice = parseFloat(String(price));
+    if (Number.isNaN(parsedPrice)) {
+      return reply.code(500).send({ error: 'Invalid price format' });
+    }
+
+    return reply.send({ price: parsedPrice });
   });
 };

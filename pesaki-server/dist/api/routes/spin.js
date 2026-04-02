@@ -10,6 +10,17 @@ const spinSchema = zod_1.z.object({
     mode: zod_1.z.enum(['real', 'demo']),
 });
 const spinRoutes = async (fastify) => {
+    // GET /games/spin/prizes — returns prizes for the frontend wheel
+    fastify.get('/prizes', async (request, reply) => {
+        try {
+            const prizes = await (0, engine_1.getPrizes)();
+            return reply.send({ success: true, data: prizes });
+        }
+        catch (err) {
+            logger_1.logger.error(err, 'Failed to fetch spin prizes');
+            return reply.code(500).send({ success: false, error: 'Could not load prizes' });
+        }
+    });
     fastify.post('/play', { preHandler: [auth_1.verifyAuth] }, async (request, reply) => {
         const parsed = spinSchema.safeParse(request.body);
         if (!parsed.success) {

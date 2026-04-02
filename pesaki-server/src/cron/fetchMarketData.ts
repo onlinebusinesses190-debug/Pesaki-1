@@ -7,8 +7,20 @@ export const fetchMarketData = async () => {
 
   try {
     // 1. Fetch Forex Rates (Free Frankfurter API)
-    // Fetching relative to both EUR and USD to get all needed pairs
-    const res = await axios.get('https://api.frankfurter.app/latest?symbols=KES,USD,GBP,JPY');
+    // Use stable endpoint with explicit from base currency and target symbols
+    const res = await axios.get('https://api.frankfurter.app/latest', {
+      params: {
+        from: 'EUR',
+        to: 'KES,USD,GBP,JPY',
+      },
+      timeout: 15000,
+      validateStatus: (status) => status >= 200 && status < 500,
+    });
+
+    if (res.status === 404 || res.status === 422) {
+      throw new Error(`Frankfurter endpoint returned ${res.status}`);
+    }
+
     const data = res.data;
 
     if (data && data.rates) {

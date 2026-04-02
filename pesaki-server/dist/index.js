@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+require("dotenv/config");
 const fastify_1 = __importDefault(require("fastify"));
 const cors_1 = __importDefault(require("@fastify/cors"));
 const env_1 = require("./config/env");
@@ -14,10 +15,10 @@ const api_1 = require("./api");
 const rateLimit_1 = require("./middleware/rateLimit");
 const startServer = async () => {
     try {
-        const server = (0, fastify_1.default)({ logger: false }); // Disable fastify built-in logger to use pino explicitly
+        const server = (0, fastify_1.default)({ logger: true });
         // Register Plugins
         await server.register(cors_1.default, {
-            origin: env_1.env.CORS_ORIGIN,
+            origin: true,
             credentials: true,
         });
         await (0, rateLimit_1.setupRateLimit)(server);

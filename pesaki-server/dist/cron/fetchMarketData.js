@@ -11,29 +11,60 @@ const fetchMarketData = async () => {
     logger_1.logger.info('Fetching live market data...');
     try {
         // 1. Fetch Forex Rates (Free Frankfurter API)
-        const fxResponse = await axios_1.default.get('https://api.frankfurter.app/latest?to=KES');
-        if (fxResponse.data && fxResponse.data.rates && fxResponse.data.rates.KES) {
-            const gbpResponse = await axios_1.default.get('https://api.frankfurter.app/latest?from=GBP&to=KES');
-            const eurResponse = await axios_1.default.get('https://api.frankfurter.app/latest?from=EUR&to=KES');
-            const usdKes = fxResponse.data.rates.KES;
-            const gbpKes = gbpResponse.data.rates.KES;
-            const eurKes = eurResponse.data.rates.KES;
-            // TTL of 6 minutes (360s) so it outlives the 5-minute fetch slightly
-            await redis_1.redis.set('market:USD/KES', usdKes, 'EX', 360);
-            await redis_1.redis.set('market:GBP/KES', gbpKes, 'EX', 360);
-            await redis_1.redis.set('market:EUR/KES', eurKes, 'EX', 360);
-            logger_1.logger.info(`Forex Updated: USD/KES=${usdKes}, GBP/KES=${gbpKes}, EUR/KES=${eurKes}`);
+        // Use stable endpoint with explicit from base currency and target symbols
+        const res = await axios_1.default.get('https://api.frankfurter.app/latest', {
+            params: {
+                from: 'EUR',
+                to: 'KES,USD,GBP,JPY',
+            },
+            timeout: 15000,
+            validateStatus: (status) => status >= 200 && status < 500,
+        });
+        if (res.status === 404 || res.status === 422) {
+            throw new Error(`Frankfurter endpoint returned ${res.status}`);
         }
-        // 2. Fetch NSE Data 
-        // Usually retrieved via an internal proxy or public feed, mocking for structure here
-        const nseSafaricomStr = await redis_1.redis.get('mock:NSE/SCOM');
-        const baseScom = nseSafaricomStr ? parseFloat(nseSafaricomStr) : 15.00;
-        const newScom = baseScom + (Math.random() * 0.4 - 0.2); // random walk
-        await redis_1.redis.set('market:NSE/SCOM', newScom.toFixed(2), 'EX', 360);
-        logger_1.logger.info(`NSE Updated: NSE/SCOM=${newScom.toFixed(2)}`);
+        const data = res.data;
+        if (data && data.rates) {
+            const rates = data.rates;
+            // EUR based (since Frankfurter default is EUR)
+            const eurUsd = rates.USD || 1.08;
+            const eurGbp = rates.GBP || 0.85;
+            const eurKes = rates.KES || 142.00;
+            const eurJpy = rates.JPY || 163.00;
+            // Derived pairs
+            const usdKes = eurKes / eurUsd;
+            const gbpUsd = eurUsd / eurGbp;
+            const gbpKes = eurKes / eurGbp;
+            // Save to Redis
+            await redis_1.redis.set('market:EUR/USD', eurUsd.toFixed(4), { ex: 360 });
+            await redis_1.redis.set('market:EUR/GBP', eurGbp.toFixed(4), { ex: 360 });
+            await redis_1.redis.set('market:EUR/KES', eurKes.toFixed(2), { ex: 360 });
+            await redis_1.redis.set('market:USD/KES', usdKes.toFixed(2), { ex: 360 });
+            await redis_1.redis.set('market:GBP/USD', gbpUsd.toFixed(4), { ex: 360 });
+            await redis_1.redis.set('market:GBP/KES', gbpKes.toFixed(2), { ex: 360 });
+            await redis_1.redis.set('market:USD/JPY', (eurJpy / eurUsd).toFixed(2), { ex: 360 });
+            // Mock some for missing ones in basic API (XAU/USD - Gold)
+            await redis_1.redis.set('market:XAU/USD', (2150.00 + Math.random() * 10).toFixed(2), { ex: 360 });
+            logger_1.logger.info('Market Data Updated successfully');
+        }
     }
     catch (err) {
-        logger_1.logger.error(err, 'Error fetching live market data');
+        logger_1.logger.error({ error: err.message }, 'Error fetching live market data - using fallbacks');
+        // Provide some minimal fallbacks so the app isn't broken
+        await redis_1.redis.set('market:EUR/USD', '1.0850', { ex: 360 });
+        await redis_1.redis.set('market:USD/KES', '132.50', { ex: 360 });
+        await redis_1.redis.set('market:GBP/USD', '1.2640', { ex: 360 });
+        await redis_1.redis.set('market:XAU/USD', '2165.40', { ex: 360 });
+    }
+    // 2. Fetch NSE Data (Mocked)
+    try {
+        const nseSafaricomStr = await redis_1.redis.get('market:NSE/SCOM');
+        const baseScom = nseSafaricomStr ? parseFloat(String(nseSafaricomStr)) : 15.00;
+        const newScom = baseScom + (Math.random() * 0.4 - 0.2);
+        await redis_1.redis.set('market:NSE/SCOM', newScom.toFixed(2), { ex: 360 });
+    }
+    catch (e) {
+        logger_1.logger.error('NSE Update failed');
     }
 };
 exports.fetchMarketData = fetchMarketData;

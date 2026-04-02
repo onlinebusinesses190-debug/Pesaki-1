@@ -19,16 +19,21 @@ const getAviatorState = () => ({
     activeBets: Array.from(activeBets.entries()),
 });
 exports.getAviatorState = getAviatorState;
-const placeBet = (userId, amount, mode) => {
+const placeBet = async (userId, amount, mode) => {
     if (currentRound?.status !== 'WAITING') {
         throw new Error('Round is already in progress');
     }
     if (activeBets.has(userId)) {
         throw new Error('You already placed a bet this round');
     }
+    // Deduct from wallet first
+    const debitRes = await (0, service_1.debit)(userId, amount, mode, 'Aviator Bet');
+    if (!debitRes.success) {
+        throw new Error(debitRes.error || 'Insufficient funds');
+    }
     const bet = { userId, amount, mode, cashedOut: false };
     activeBets.set(userId, bet);
-    return bet;
+    return { bet, newBalance: debitRes.newBalance };
 };
 exports.placeBet = placeBet;
 const cashOut = async (userId) => {

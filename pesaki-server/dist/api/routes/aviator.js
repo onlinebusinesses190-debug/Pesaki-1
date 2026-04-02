@@ -15,8 +15,8 @@ const aviatorRoutes = async (fastify) => {
             return reply.code(400).send({ success: false, error: 'Invalid payload', code: 'BAD_REQUEST' });
         }
         try {
-            const bet = (0, engine_1.placeBet)(request.user.id, parsed.data.amount, parsed.data.mode);
-            return reply.send({ success: true, data: { bet } });
+            const result = await (0, engine_1.placeBet)(request.user.id, parsed.data.amount, parsed.data.mode);
+            return reply.send({ success: true, data: result });
         }
         catch (err) {
             return reply.code(400).send({ success: false, error: err.message, code: 'AVIATOR_ERROR' });

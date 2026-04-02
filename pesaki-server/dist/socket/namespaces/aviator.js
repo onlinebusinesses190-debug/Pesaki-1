@@ -20,7 +20,7 @@ const setupAviatorNamespace = (io) => {
             try {
                 const userId = socket.data.user.id;
                 const result = await (0, engine_1.cashOut)(userId);
-                socket.emit('CASHOUT_SUCCESS', result);
+                socket.emit('CASHED_OUT', result);
             }
             catch (error) {
                 socket.emit('CASHOUT_FAILED', { error: error.message });

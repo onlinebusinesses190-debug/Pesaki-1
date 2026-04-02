@@ -26,7 +26,14 @@ const computeCrashPoint = (serverSeed, clientSeed) => {
     const hash = crypto_1.default.createHmac('sha256', serverSeed).update(clientSeed).digest('hex');
     const h = parseInt(hash.slice(0, 13), 16);
     const e = Math.pow(2, 52);
-    const result = Math.floor((100 * e - h) / (e - h));
-    return Math.max(100, result) / 100; // Return multiplier like 1.05, 2.45
+    // 1. House Edge: 3% chance to crash instantly at 1.00x
+    if (h % 33 === 0)
+        return 1.00;
+    // 2. Calculate point (standard Aviator formula)
+    let result = Math.floor((100 * e - h) / (e - h));
+    // 3. Cap at 100.00x to prevent platform draining
+    if (result > 10000)
+        result = 10000;
+    return Math.max(100, result) / 100; // Return multiplier like 1.05, 2.45, max 100.0
 };
 exports.computeCrashPoint = computeCrashPoint;

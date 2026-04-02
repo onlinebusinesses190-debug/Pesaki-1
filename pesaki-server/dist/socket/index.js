@@ -12,8 +12,8 @@ const initSocket = (server) => {
             methods: ['GET', 'POST']
         }
     });
-    // Global Middleware for Auth
-    exports.io.use(async (socket, next) => {
+    // Extract Middleware for Auth
+    const socketAuthMiddleware = async (socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token) {
             return next(new Error('Authentication error: Missing token'));
@@ -24,14 +24,17 @@ const initSocket = (server) => {
         }
         socket.data.user = { id: user.id, email: user.email };
         next();
-    });
+    };
+    // Apply middleware to the main namespace
+    exports.io.use(socketAuthMiddleware);
+    // Apply middleware and setup to the Aviator namespace specifically
+    exports.io.of('/aviator').use(socketAuthMiddleware);
+    (0, aviator_1.setupAviatorNamespace)(exports.io);
     exports.io.on('connection', (socket) => {
         logger_1.logger.info({ socketId: socket.id, userId: socket.data.user.id }, 'Socket connected');
         socket.on('disconnect', () => {
             logger_1.logger.info({ socketId: socket.id, userId: socket.data.user.id }, 'Socket disconnected');
         });
     });
-    // Initialize namespaces
-    (0, aviator_1.setupAviatorNamespace)(exports.io);
 };
 exports.initSocket = initSocket;

@@ -30,6 +30,7 @@ export async function apiServerRequest(path: string, options: RequestInit = {}) 
     headers.set('Content-Type', 'application/json');
 
     const fetchUrl = path.startsWith('http') ? path : `${API_URL}${path}`;
+    console.info('API Server Request - fetchUrl', fetchUrl, 'method', options.method || 'GET');
 
     const response = await fetch(fetchUrl, {
         ...options,
