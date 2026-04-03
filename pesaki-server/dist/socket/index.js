@@ -8,9 +8,14 @@ const aviator_1 = require("./namespaces/aviator");
 const initSocket = (server) => {
     exports.io = new socket_io_1.Server(server, {
         cors: {
-            origin: process.env.CORS_ORIGIN || '*',
-            methods: ['GET', 'POST']
-        }
+            origin: [
+                'http://localhost:3000',
+                'https://pesaki.vercel.app',
+            ],
+            methods: ['GET', 'POST'],
+            credentials: true
+        },
+        transports: ['websocket']
     });
     // Extract Middleware for Auth
     const socketAuthMiddleware = async (socket, next) => {

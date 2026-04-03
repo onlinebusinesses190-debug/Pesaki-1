@@ -16,10 +16,14 @@ const rateLimit_1 = require("./middleware/rateLimit");
 const startServer = async () => {
     try {
         const server = (0, fastify_1.default)({ logger: true });
-        // Register Plugins
+        // Fastify CORS
         await server.register(cors_1.default, {
-            origin: true,
+            origin: [
+                'http://localhost:3000',
+                'https://pesaki.vercel.app',
+            ],
             credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
         });
         await (0, rateLimit_1.setupRateLimit)(server);
         // Register REST API Routes

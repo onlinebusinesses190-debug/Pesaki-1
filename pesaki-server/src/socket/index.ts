@@ -8,9 +8,14 @@ export let io: Server;
 export const initSocket = (server: any) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.CORS_ORIGIN || '*',
-      methods: ['GET', 'POST']
-    }
+      origin: [
+        'http://localhost:3000',
+        'https://pesaki.vercel.app',
+      ],
+      methods: ['GET', 'POST'],
+      credentials: true
+    },
+    transports: ['websocket']
   });
 
   // Extract Middleware for Auth

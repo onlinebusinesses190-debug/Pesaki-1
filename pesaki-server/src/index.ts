@@ -13,10 +13,14 @@ const startServer = async () => {
   try {
     const server = fastify({ logger: true }); 
     
-    // Register Plugins
+    // Fastify CORS
     await server.register(cors, {
-      origin: true, 
+      origin: [
+        'http://localhost:3000',
+        'https://pesaki.vercel.app',
+      ],
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     });
     
     await setupRateLimit(server);
