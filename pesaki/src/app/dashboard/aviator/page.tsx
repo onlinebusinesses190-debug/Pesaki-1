@@ -65,8 +65,25 @@ export default function AviatorPage() {
             if (!session) return;
 
             const socket = io(`${API_URL}/aviator`, {
+                transports: ['websocket'],
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
                 auth: { token: session.access_token }
             });
+
+            // Debug Logs
+            socket.on('connect', () => {
+              console.log('✅ Aviator socket connected:', socket.id)
+            })
+
+            socket.on('connect_error', (err) => {
+              console.error('❌ Aviator socket error:', err.message)
+            })
+
+            socket.on('disconnect', (reason) => {
+              console.warn('⚠️ Aviator socket disconnected:', reason)
+            })
 
             socketRef.current = socket;
 
@@ -79,18 +96,21 @@ export default function AviatorPage() {
                 setIsBetting(false);
             });
 
-            socket.on('ROUND_START', () => {
+            socket.on('ROUND_START', (data) => {
+                console.log('🎮 ROUND_START received:', data)
                 setStatus('FLYING');
                 setWaitTime(0);
             });
 
             socket.on('MULTIPLIER_TICK', (data) => {
+                console.log('📈 MULTIPLIER_TICK:', data.multiplier)
                 const newMult = parseFloat(data.multiplier);
                 setMultiplier(newMult);
                 multiplierRef.current = newMult;
             });
 
             socket.on('ROUND_CRASHED', (data) => {
+                console.log('💥 ROUND_CRASHED at:', data.multiplier)
                 setStatus('CRASHED');
                 const finalMult = parseFloat(data.multiplier);
                 setMultiplier(finalMult);
