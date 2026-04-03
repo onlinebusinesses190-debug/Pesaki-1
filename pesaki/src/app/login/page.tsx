@@ -71,8 +71,6 @@ export default function LoginPage() {
                         access_token: result.session.access_token,
                         refresh_token: result.session.refresh_token,
                     })
-                } else if (typeof supabase.auth.signIn === 'function') {
-                    // fallback: sign in on client (not recommended) — skip
                 }
             }
         } catch (err) {
