@@ -4,37 +4,72 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient as createBrowserClient } from './supabase/client'
 
-export function useAuthGuard(redirectTo = '/login') {
+export function useAuthGuard() {
   const [ready, setReady] = useState(false)
-  const router = useRouter()
+  const [hasSession, setHasSession] = useState(false)
 
   useEffect(() => {
     let mounted = true
+    let unsubscribe: (() => void) | null = null
 
-    const checkSession = async () => {
+    const initAuth = async () => {
       try {
         const supabase = createBrowserClient()
-        const { data: { session } } = await supabase.auth.getSession()
 
-        if (!session?.access_token) {
-          router.replace(redirectTo)
+        // Listener for auth state changes — do not redirect here.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (!mounted) return
+          // Debug logging to help trace unexpected sign-outs
+          console.debug('[useAuthGuard] auth event:', event, !!session?.user?.id)
+          // Persist lightweight auth event trace to localStorage for debugging
+          try {
+            const key = 'pesaki_auth_events'
+            const prev = JSON.parse(localStorage.getItem(key) || '[]')
+            prev.push({ ts: Date.now(), event, userId: session?.user?.id || null })
+            if (prev.length > 50) prev.shift()
+            localStorage.setItem(key, JSON.stringify(prev))
+          } catch (e) {
+            // ignore storage errors
+          }
+          setHasSession(!!session?.user?.id)
+          setReady(true)
+        })
+
+        unsubscribe = subscription?.unsubscribe
+
+        // Immediate session check with a short hydration window
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+
+        if (session?.user?.id) {
+          setHasSession(true)
+          setReady(true)
           return
         }
-      } catch (error) {
-        console.error('Auth guard error', error)
-        router.replace(redirectTo)
-        return
-      } finally {
-        if (mounted) setReady(true)
+
+        // Allow supabase client a short moment to hydrate from storage
+        await new Promise(resolve => setTimeout(resolve, 500))
+        if (!mounted) return
+
+        const { data: { session: retrySession } } = await supabase.auth.getSession()
+        setHasSession(!!retrySession?.user?.id)
+        setReady(true)
+      } catch (err) {
+        console.error('[useAuthGuard] init error', err)
+        if (mounted) {
+          setHasSession(false)
+          setReady(true)
+        }
       }
     }
 
-    checkSession()
+    initAuth()
 
     return () => {
       mounted = false
+      unsubscribe?.()
     }
-  }, [router, redirectTo])
+  }, [])
 
-  return ready
+  return { ready, hasSession }
 }

@@ -6,20 +6,15 @@ import { ArrowUp, ArrowDown, Clock, Trophy, History, Loader2 } from 'lucide-reac
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
 import { ModeToggle } from '@/components/dashboard/ModeToggle'
-import { useAuthGuard } from '@/utils/auth'
+import { AuthGuarded } from '@/components/AuthGuarded'
 
 type GameState = 'OPEN' | 'LOCKED' | 'RESULT'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function UpDownGame() {
-    const authReady = useAuthGuard()
     const [gameState, setGameState] = useState<GameState>('OPEN')
     const [timeLeft, setTimeLeft] = useState(300) 
-
-    if (!authReady) {
-        return <div className="w-full text-center py-24 text-white">Validating session…</div>
-    }
     const [price, setPrice] = useState(1.0850)
     const [startPrice, setStartPrice] = useState(1.0850)
     const [selectedDirection, setSelectedDirection] = useState<'UP' | 'DOWN' | null>(null)
@@ -92,7 +87,8 @@ export default function UpDownGame() {
     }
 
     return (
-        <div className="space-y-6">
+        <AuthGuarded>
+            <div className="space-y-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -233,7 +229,8 @@ export default function UpDownGame() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+        </AuthGuarded>
     )
 }
 

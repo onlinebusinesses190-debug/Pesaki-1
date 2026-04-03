@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createClient as createBrowserClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -57,6 +58,25 @@ export default function LoginPage() {
             setIsSignUp(false)
             setLoading(false)
             return
+        }
+
+        // If server returned a session, populate the browser Supabase client
+        try {
+            const supabase = createBrowserClient()
+            if (result?.session) {
+                // supabase.auth.setSession expects tokens; use setSession when available
+                // v2: setSession({ access_token, refresh_token })
+                if (typeof supabase.auth.setSession === 'function') {
+                    await supabase.auth.setSession({
+                        access_token: result.session.access_token,
+                        refresh_token: result.session.refresh_token,
+                    })
+                } else if (typeof supabase.auth.signIn === 'function') {
+                    // fallback: sign in on client (not recommended) — skip
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to populate client session', err)
         }
 
         router.push('/dashboard')

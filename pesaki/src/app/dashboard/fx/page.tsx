@@ -6,7 +6,7 @@ import { TradingChart } from '@/components/fx/TradingChart'
 import { ArrowUp, ArrowDown, Activity, RefreshCw } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
-import { useAuthGuard } from '@/utils/auth'
+import { AuthGuarded } from '@/components/AuthGuarded'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -28,20 +28,14 @@ const generateData = (count: number, basePrice: number) => {
 }
 
 export default function FXPage() {
-    const authReady = useAuthGuard()
+    const searchParams = useSearchParams()
+    const mode = searchParams.get('mode') === 'real' ? 'real' : 'demo'
     const [data, setData] = useState<any[]>([])
     const [currentPrice, setCurrentPrice] = useState<number | null>(null)
-
-    if (!authReady) {
-        return <div className="w-full text-center py-24 text-white">Validating session…</div>
-    }
     const [pair, setPair] = useState('EUR/USD')
     const [lotSize, setLotSize] = useState('0.10')
     const [loading, setLoading] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
-
-    const searchParams = useSearchParams()
-    const mode = searchParams.get('mode') === 'real' ? 'real' : 'demo'
 
     const fetchPrice = useCallback(async (isInitial = false) => {
         try {
@@ -110,7 +104,8 @@ export default function FXPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <AuthGuarded>
+            <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -216,6 +211,7 @@ export default function FXPage() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+        </AuthGuarded>
     )
 }

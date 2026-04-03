@@ -11,17 +11,24 @@ declare module 'fastify' {
 export const verifyAuth = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return reply.code(401).send({ success: false, error: 'Missing or invalid Authorization header', code: 'UNAUTHORIZED' });
+    
+    if (!authHeader) {
+      logger.warn('No Authorization header provided');
+      return reply.code(401).send({ success: false, error: 'Missing Authorization header', code: 'MISSING_HEADER' });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      logger.warn('Invalid Authorization format');
+      return reply.code(401).send({ success: false, error: 'Invalid Authorization format (expected Bearer token)', code: 'INVALID_FORMAT' });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.slice(7); // Remove 'Bearer ' prefix
     
-    // Auth validation using Supabase service role client to verify actual token payload
+    // Verify token using Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      logger.warn({ err: error?.message }, 'Authentication failed');
+      logger.warn({ message: error?.message }, 'Token verification failed');
       return reply.code(401).send({ success: false, error: 'Invalid or expired token', code: 'UNAUTHORIZED' });
     }
 

@@ -4,24 +4,21 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { Plane, Coins, AlertCircle, Loader2 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
+import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
 import { ModeToggle } from '@/components/dashboard/ModeToggle'
-import { useAuthGuard } from '@/utils/auth'
+import { AuthGuarded } from '@/components/AuthGuarded'
+import { AviatorCanvas } from '@/components/aviator/AviatorCanvas'
 
 type GameStatus = 'WAITING' | 'FLYING' | 'CRASHED'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function AviatorPage() {
-    const authReady = useAuthGuard()
     const [status, setStatus] = useState<GameStatus>('WAITING')
     const [multiplier, setMultiplier] = useState(1.00)
-
-    if (!authReady) {
-        return <div className="w-full text-center py-24 text-white">Validating session…</div>
-    }
     const [betAmount, setBetAmount] = useState('100')
     const [cashedOut, setCashedOut] = useState(false)
     const [cashOutMultiplier, setCashOutMultiplier] = useState(0)
@@ -58,124 +55,7 @@ export default function AviatorPage() {
     // Add a state for particles to create a beautiful trail
     const [particles, setParticles] = useState<{ x: number, y: number, life: number }[]>([])
 
-    // Canvas Drawing
-    const drawCanvas = (currentMult: number, isCrashed: boolean) => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        const width = canvas.width
-        const height = canvas.height
-
-        // Clear with a slight fade effect for trail persistence if desired, 
-        // but for now let's just clear fully and draw our own particles.
-        ctx.clearRect(0, 0, width, height)
-
-        // Draw Grid
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
-        ctx.lineWidth = 1
-        for (let i = 0; i < width; i += 50) {
-            ctx.beginPath()
-            ctx.moveTo(i, 0)
-            ctx.lineTo(i, height)
-            ctx.stroke()
-        }
-        for (let i = 0; i < height; i += 50) {
-            ctx.beginPath()
-            ctx.moveTo(0, i)
-            ctx.lineTo(width, i)
-            ctx.stroke()
-        }
-
-        // Calculate Position
-        // Path grows exponentially: x starts slow and speeds up, y starts low and goes high
-        const progress = Math.min(1, (currentMult - 1) / 10) // Normalize roughly for first 10x
-        const px = 50 + (width - 100) * (1 - Math.pow(1 - progress, 2)) // Ease out x
-        const py = height - 50 - (height - 100) * Math.pow(progress, 1.5) // Ease in y
-
-        // Draw Flight Path (Curve)
-        ctx.beginPath()
-        ctx.strokeStyle = '#ef4444'
-        ctx.lineWidth = 3
-        ctx.lineJoin = 'round'
-        ctx.moveTo(50, height - 50)
-        
-        // Use quadratic curve for smoothness
-        const cpX = px * 0.5 + 25
-        const cpY = height - 50
-        ctx.quadraticCurveTo(cpX, cpY, px, py)
-        
-        // Add a glowing gradient to the line
-        const grad = ctx.createLinearGradient(50, height - 50, px, py)
-        grad.addColorStop(0, 'rgba(239, 68, 68, 0)')
-        grad.addColorStop(1, '#ef4444')
-        ctx.strokeStyle = grad
-        ctx.stroke()
-
-        // Draw Particles (The Trail)
-        if (status === 'FLYING') {
-            setParticles(prev => [
-                { x: px, y: py, life: 1.0 },
-                ...prev.map(p => ({ ...p, life: p.life - 0.05 })).filter(p => p.life > 0)
-            ].slice(0, 30))
-        }
-
-        particles.forEach(p => {
-            ctx.beginPath()
-            ctx.fillStyle = `rgba(239, 68, 68, ${p.life * 0.5})`
-            ctx.arc(p.x, p.y, 2 * p.life, 0, Math.PI * 2)
-            ctx.fill()
-        })
-
-        // Draw The Plane (Red Arrow Redesign)
-        ctx.save()
-        ctx.translate(px, py)
-        
-        // Calculate rotation based on trajectory
-        const angle = Math.atan2(py - (height - 50), px - 50)
-        ctx.rotate(angle)
-
-        if (isCrashed) {
-            ctx.scale(1.2, 1.2)
-            ctx.shadowBlur = 20
-            ctx.shadowColor = '#ef4444'
-        }
-
-        // Sleek Plane Shape
-        ctx.beginPath()
-        ctx.fillStyle = '#ef4444'
-        
-        // Body
-        ctx.moveTo(15, 0)
-        ctx.lineTo(-15, -8)
-        ctx.lineTo(-10, 0)
-        ctx.lineTo(-15, 8)
-        ctx.closePath()
-        ctx.fill()
-
-        // Wing
-        ctx.beginPath()
-        ctx.fillStyle = '#b91c1c' // Darker red for depth
-        ctx.moveTo(-5, 0)
-        ctx.lineTo(-12, -15)
-        ctx.lineTo(-2, -15)
-        ctx.lineTo(5, 0)
-        ctx.closePath()
-        ctx.fill()
-
-        ctx.restore()
-
-        if (isCrashed) {
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'
-            ctx.fillRect(0, 0, width, height)
-            
-            ctx.fillStyle = 'white'
-            ctx.font = '900 48px sans-serif'
-            ctx.textAlign = 'center'
-            ctx.fillText("FLEW AWAY!", width / 2, height / 2)
-        }
-    }
+    // Legacy Canvas Drawing removed in favor of AviatorCanvas component
 
     useEffect(() => {
         const supabase = createClient();
@@ -197,7 +77,6 @@ export default function AviatorPage() {
                 setWaitTime(data.waitTime / 1000);
                 setCashedOut(false);
                 setIsBetting(false);
-                drawCanvas(1.00, false);
             });
 
             socket.on('ROUND_START', () => {
@@ -209,7 +88,6 @@ export default function AviatorPage() {
                 const newMult = parseFloat(data.multiplier);
                 setMultiplier(newMult);
                 multiplierRef.current = newMult;
-                drawCanvas(newMult, false);
             });
 
             socket.on('ROUND_CRASHED', (data) => {
@@ -218,7 +96,6 @@ export default function AviatorPage() {
                 setMultiplier(finalMult);
                 multiplierRef.current = finalMult;
                 setHistory(prev => [finalMult, ...prev.slice(0, 19)]);
-                drawCanvas(finalMult, true);
             });
 
             socket.on('CASHED_OUT', (data) => {
@@ -231,55 +108,40 @@ export default function AviatorPage() {
 
         initGame();
 
-        const canvas = canvasRef.current
-        if (canvas) {
-            canvas.width = canvas.parentElement?.clientWidth || 800
-            canvas.height = 400
-        }
-
         return () => {
             socketRef.current?.disconnect();
         }
     }, [])
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <AuthGuarded>
+            <div className="space-y-6">
+             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                     <Plane className={`text-red-500 ${status === 'FLYING' ? 'animate-pulse' : ''}`} /> AviMarket
                 </h1>
-                <div className="flex gap-2 text-sm overflow-x-auto max-w-[500px]">
-                    {history.map((m, i) => (
-                        <div key={i} className={`px-2 py-1 rounded font-mono font-bold ${m < 2.0 ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
-                            }`}>
-                            {m.toFixed(2)}x
-                        </div>
-                    ))}
-                </div>
             </div>
 
             <ModeToggle />
-
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-3 bg-card border border-border rounded-2xl relative overflow-hidden h-[500px] flex flex-col">
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <div className={`text-8xl font-black tracking-tighter transition-all ${status === 'CRASHED' ? 'text-red-600 scale-110' : 'text-white'
-                            }`}>
-                            {multiplier.toFixed(2)}x
-                        </div>
-                        {status === 'CRASHED' && (
-                            <div className="absolute top-[60%] text-red-500 font-bold text-xl animate-bounce">
-                                FLEW AWAY!
-                            </div>
-                        )}
+                <div className="lg:col-span-3 h-[500px] relative">
+                    <AviatorCanvas 
+                        multiplier={multiplier} 
+                        gameState={status} 
+                        roundHistory={history} 
+                    />
+                    
+                    <AnimatePresence>
                         {cashedOut && (
-                            <div className="absolute top-[30%] bg-green-500/90 text-black px-6 py-2 rounded-full font-bold text-xl animate-fade-up">
-                                You Won: KSh {(parseFloat(betAmount) * cashOutMultiplier).toFixed(2)}
-                            </div>
+                            <motion.div 
+                                initial={{ y: -20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="absolute top-[20%] left-1/2 -translate-x-1/2 bg-green-500 text-black px-8 py-3 rounded-2xl font-black text-2xl shadow-[0_0_40px_rgba(34,197,94,0.6)] z-50 pointer-events-none"
+                            >
+                                WON: KSh {(parseFloat(betAmount) * cashOutMultiplier).toFixed(2)}
+                            </motion.div>
                         )}
-                    </div>
-
-                    <canvas ref={canvasRef} className="w-full h-full bg-black/50" />
+                    </AnimatePresence>
                 </div>
 
                 <div className="bg-card border border-border rounded-xl p-6 flex flex-col gap-6">
@@ -328,6 +190,7 @@ export default function AviatorPage() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+        </AuthGuarded>
     )
 }

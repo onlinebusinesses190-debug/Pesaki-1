@@ -189,10 +189,17 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
-    const supabase = createClient()
+    const [supabase, setSupabase] = useState<any>(null)
+
+    useEffect(() => {
+        import('@/utils/supabase/client').then(({ createClient }) => {
+            setSupabase(() => createClient())
+        })
+    }, [])
     const mode = (searchParams.get('mode') as 'real' | 'demo') || 'demo'
 
     const handleSignOut = async () => {
+        if (!supabase) return
         await supabase.auth.signOut()
         router.push('/login')
         router.refresh()
@@ -206,6 +213,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
 
     useEffect(() => {
         const fetchRole = async () => {
+            if (!supabase) return
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
                 const { data: profile } = await supabase
@@ -217,7 +225,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
             }
         }
         fetchRole()
-    }, [])
+    }, [supabase])
 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Home },
