@@ -1,5 +1,4 @@
 import { Server, Socket } from 'socket.io';
-import { FastifyInstance } from 'fastify';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import { setupAviatorNamespace } from './namespaces/aviator';

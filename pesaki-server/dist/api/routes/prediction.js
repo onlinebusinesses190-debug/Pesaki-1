@@ -29,7 +29,7 @@ const predictionRoutes = async (fastify) => {
         }
     });
     // Expose manual run settle route (could restrict heavily in production)
-    fastify.post('/settle', { preHandler: [auth_1.verifyAuth] }, async (request, reply) => {
+    fastify.post('/settle', { preHandler: [auth_1.verifyAuth] }, async (_, reply) => {
         await (0, engine_1.settlePredictions)();
         return reply.send({ success: true });
     });

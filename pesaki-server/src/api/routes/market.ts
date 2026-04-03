@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import { redis } from '../../lib/redis';
 
 export const marketRoutes = async (fastify: FastifyInstance) => {

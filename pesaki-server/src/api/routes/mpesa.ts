@@ -29,13 +29,12 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
       const callbackMetadata = stkCallback.CallbackMetadata;
       let amount = 0;
       let mpesaReceipt = '';
-      let phoneNumber = '';
 
       if (callbackMetadata && callbackMetadata.Item) {
         callbackMetadata.Item.forEach((item: any) => {
           if (item.Name === 'Amount') amount = item.Value;
           if (item.Name === 'MpesaReceiptNumber') mpesaReceipt = item.Value;
-          if (item.Name === 'PhoneNumber') phoneNumber = item.Value;
+// Phone number handled by M-Pesa natively, not needed for inner logic
         });
       }
 

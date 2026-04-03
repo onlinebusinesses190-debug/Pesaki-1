@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { playRound, getPrizes } from '../../games/spin/engine';
 import { verifyAuth } from '../../middleware/auth';
@@ -11,7 +11,7 @@ const spinSchema = z.object({
 
 export const spinRoutes = async (fastify: FastifyInstance) => {
   // GET /games/spin/prizes — returns prizes for the frontend wheel
-  fastify.get('/prizes', async (request, reply) => {
+  fastify.get('/prizes', async (_, reply) => {
     try {
       const prizes = await getPrizes();
       return reply.send({ success: true, data: prizes });

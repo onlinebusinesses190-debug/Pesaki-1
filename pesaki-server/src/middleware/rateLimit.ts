@@ -5,7 +5,7 @@ export const setupRateLimit = async (fastify: FastifyInstance) => {
   await fastify.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
-    errorResponseBuilder: (request, context) => ({
+    errorResponseBuilder: () => ({
       success: false,
       error: 'Too many requests, please try again later.',
       code: 'RATE_LIMIT_EXCEEDED'

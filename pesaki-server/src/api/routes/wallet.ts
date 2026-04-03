@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getBalance, credit, debit } from '../../wallet/service';
 import { verifyAuth } from '../../middleware/auth';

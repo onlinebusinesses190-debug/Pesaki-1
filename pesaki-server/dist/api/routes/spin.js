@@ -11,7 +11,7 @@ const spinSchema = zod_1.z.object({
 });
 const spinRoutes = async (fastify) => {
     // GET /games/spin/prizes — returns prizes for the frontend wheel
-    fastify.get('/prizes', async (request, reply) => {
+    fastify.get('/prizes', async (_, reply) => {
         try {
             const prizes = await (0, engine_1.getPrizes)();
             return reply.send({ success: true, data: prizes });

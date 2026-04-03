@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { placeBet } from '../../games/aviator/engine';
 import { verifyAuth } from '../../middleware/auth';

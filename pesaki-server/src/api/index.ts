@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { verifyAuth } from '../middleware/auth';
 import { walletRoutes } from './routes/wallet';
 import { aviatorRoutes } from './routes/aviator';
 import { mpesaRoutes } from './routes/mpesa';

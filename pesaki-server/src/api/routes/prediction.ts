@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { placePrediction, settlePredictions } from '../../games/prediction/engine';
 import { verifyAuth } from '../../middleware/auth';
@@ -30,7 +30,7 @@ export const predictionRoutes = async (fastify: FastifyInstance) => {
   });
   
   // Expose manual run settle route (could restrict heavily in production)
-  fastify.post('/settle', { preHandler: [verifyAuth] }, async (request, reply) => {
+  fastify.post('/settle', { preHandler: [verifyAuth] }, async (_, reply) => {
      await settlePredictions();
      return reply.send({ success: true });
   });
