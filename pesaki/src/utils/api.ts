@@ -1,6 +1,15 @@
 import { createClient as createBrowserClient } from './supabase/client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const getApiUrl = () => {
+    if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== 'undefined' && window.location.hostname) {
+        return `http://${window.location.hostname}:4000`;
+    }
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+};
+const API_URL = getApiUrl();
 
 export async function apiRequest(path: string, options: RequestInit = {}) {
     // SSR safe: only run in browser

@@ -1,239 +1,430 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
-import { ArrowUp, ArrowDown, Clock, Trophy, History, Loader2 } from 'lucide-react'
-import { apiRequest } from '@/utils/api'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { ArrowUp, ArrowDown, Loader2, TrendingUp } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { ModeToggle } from '@/components/dashboard/ModeToggle'
 import { AuthGuarded } from '@/components/AuthGuarded'
+import { createClient } from '@/utils/supabase/client'
+import { io, Socket } from 'socket.io-client'
 
-type GameState = 'OPEN' | 'LOCKED' | 'RESULT'
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+type RoundState = 'open' | 'locked' | 'result'
+
+interface UpDownRound {
+    id: string
+    market: string
+    entryPrice: number
+    closePrice: number | null
+    direction: 'up' | 'down' | null
+    state: RoundState
+    opensAt: string
+    locksAt: string
+    resultsAt: string
+}
+
+interface HistoryEntry {
+    roundId: string
+    direction: 'up' | 'down' | null
+    entryPrice: number
+    closePrice: number
+    settledAt: string
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const STAKE_PRESETS = ['50', '100', '200', '500']
+const PAYOUT = 1.9
+const TOTAL_SECONDS = 10
+
+// ── Countdown Ring Component ──────────────────────────────────────────────────
+
+function CountdownRing({ secondsLeft, total = TOTAL_SECONDS }: { secondsLeft: number; total?: number }) {
+    const r = 40
+    const circ = 2 * Math.PI * r
+    const pct = Math.max(0, secondsLeft / total)
+    const dash = pct * circ
+    const color = secondsLeft <= 3 ? '#ef4444' : secondsLeft <= 6 ? '#f59e0b' : '#10b981'
+
+    return (
+        <div className="relative flex items-center justify-center" style={{ width: 100, height: 100 }}>
+            <svg width="100" height="100" className="-rotate-90" style={{ position: 'absolute' }}>
+                <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+                <circle
+                    cx="50" cy="50" r={r} fill="none"
+                    stroke={color}
+                    strokeWidth="6"
+                    strokeDasharray={`${dash} ${circ}`}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dasharray 0.9s linear, stroke 0.5s ease' }}
+                />
+            </svg>
+            <span className="text-3xl font-black text-white tabular-nums z-10">{secondsLeft}</span>
+        </div>
+    )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function UpDownGame() {
-    const [gameState, setGameState] = useState<GameState>('OPEN')
-    const [timeLeft, setTimeLeft] = useState(300) 
-    const [price, setPrice] = useState(1.0850)
-    const [startPrice, setStartPrice] = useState(1.0850)
-    const [selectedDirection, setSelectedDirection] = useState<'UP' | 'DOWN' | null>(null)
-    const [stake, setStake] = useState('100')
-    const [history, setHistory] = useState<{ result: 'UP' | 'DOWN', time: string, price: number }[]>([])
     const searchParams = useSearchParams()
     const mode = (searchParams.get('mode') === 'real' ? 'real' : 'demo') as 'real' | 'demo'
-    const [isBetting, setIsBetting] = useState(false)
 
-    // Fetch Price
+    const socketRef = useRef<Socket | null>(null)
+    const [connected, setConnected] = useState(false)
+    const [round, setRound] = useState<UpDownRound | null>(null)
+    const [secondsLeft, setSecondsLeft] = useState(0)
+    const [history, setHistory] = useState<HistoryEntry[]>([])
+    const [lastResult, setLastResult] = useState<{
+        direction: 'up' | 'down' | null
+        entryPrice: number
+        closePrice: number
+        userWon: boolean | null
+    } | null>(null)
+    const [myBet, setMyBet] = useState<{ direction: 'up' | 'down'; amount: number } | null>(null)
+    const [stake, setStake] = useState('100')
+    const [placingBet, setPlacingBet] = useState(false)
+    const [balance, setBalance] = useState<number | null>(null)
+    const [flash, setFlash] = useState<'up' | 'down' | null>(null)
+
+    // ── Track current round id to clear myBet on new round ──────────────────
+    const currentRoundIdRef = useRef<string | null>(null)
+
+    // ── Connect socket ────────────────────────────────────────────────────────
     useEffect(() => {
-        const fetchPrice = async () => {
-            try {
-                const res = await fetch(`${API_URL}/market/price?pair=EUR/USD`);
-                const data = await res.json();
-                if (data.price) {
-                    setPrice(data.price);
+        let socket: Socket
+
+        const connect = async () => {
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session?.access_token) return
+
+            socket = io(`${API_URL}/updown`, {
+                transports: ['websocket'],
+                auth: { token: session.access_token },
+            })
+
+            socketRef.current = socket
+
+            socket.on('connect', () => setConnected(true))
+            socket.on('disconnect', () => setConnected(false))
+
+            socket.on('SYNC_STATE', (data: { round: UpDownRound | null; secondsLeft: number; history: HistoryEntry[] }) => {
+                setRound(data.round)
+                setSecondsLeft(data.secondsLeft)
+                setHistory(data.history)
+                if (data.round && data.round.id !== currentRoundIdRef.current) {
+                    currentRoundIdRef.current = data.round.id
+                    setMyBet(null)
                 }
-            } catch (e) {
-                console.error('Price fetch failed');
-            }
-        };
+            })
 
-        const interval = setInterval(fetchPrice, 5000);
-        fetchPrice();
-        return () => clearInterval(interval);
-    }, []);
+            socket.on('UPDOWN_ROUND_OPEN', (data: {
+                roundId: string; market: string; entryPrice: number
+                duration: number; opensAt: string; locksAt: string
+            }) => {
+                setRound({
+                    id: data.roundId,
+                    market: data.market,
+                    entryPrice: data.entryPrice,
+                    closePrice: null,
+                    direction: null,
+                    state: 'open',
+                    opensAt: data.opensAt,
+                    locksAt: data.locksAt,
+                    resultsAt: new Date(new Date(data.locksAt).getTime() + 2000).toISOString(),
+                })
+                setSecondsLeft(data.duration)
+                setLastResult(null)
+                setFlash(null)
+                if (data.roundId !== currentRoundIdRef.current) {
+                    currentRoundIdRef.current = data.roundId
+                    setMyBet(null)
+                }
+            })
 
-    // Game Loop Timer (UI Only)
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 0) return 300;
-                return prev - 1;
-            });
-        }, 1000)
-        return () => clearInterval(timer)
+            socket.on('UPDOWN_COUNTDOWN', (data: { secondsLeft: number }) => {
+                setSecondsLeft(data.secondsLeft)
+            })
+
+            socket.on('UPDOWN_ROUND_LOCKED', () => {
+                setRound(prev => prev ? { ...prev, state: 'locked' } : null)
+                setSecondsLeft(0)
+            })
+
+            socket.on('UPDOWN_ROUND_RESULT', (data: {
+                roundId: string; entryPrice: number; closePrice: number
+                direction: 'up' | 'down' | null; winners: number; payoutMultiplier: number
+            }) => {
+                setRound(prev => prev ? {
+                    ...prev, state: 'result',
+                    closePrice: data.closePrice,
+                    direction: data.direction,
+                } : null)
+
+                const userWon = myBet && data.direction
+                    ? myBet.direction === data.direction
+                    : null
+
+                setLastResult({
+                    direction: data.direction,
+                    entryPrice: data.entryPrice,
+                    closePrice: data.closePrice,
+                    userWon: userWon ?? null,
+                })
+
+                if (data.direction) {
+                    setFlash(data.direction)
+                    setTimeout(() => setFlash(null), 1800)
+                }
+
+                // Add to history
+                setHistory(prev => {
+                    const entry: HistoryEntry = {
+                        roundId: data.roundId,
+                        direction: data.direction,
+                        entryPrice: data.entryPrice,
+                        closePrice: data.closePrice,
+                        settledAt: new Date().toISOString(),
+                    }
+                    return [entry, ...prev].slice(0, 20)
+                })
+            })
+
+            socket.on('BET_CONFIRMED', (data: { roundId: string; direction: string; amount: number; newBalance: number }) => {
+                setMyBet({ direction: data.direction as 'up' | 'down', amount: data.amount })
+                setBalance(data.newBalance)
+                setPlacingBet(false)
+            })
+
+            socket.on('BET_REJECTED', (data: { error: string }) => {
+                alert(data.error || 'Bet rejected')
+                setPlacingBet(false)
+            })
+        }
+
+        connect()
+
+        return () => {
+            socket?.disconnect()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60)
-        const s = seconds % 60
-        return `${m}:${s.toString().padStart(2, '0')}`
-    }
+    // ── Bet handler ───────────────────────────────────────────────────────────
+    const handleBet = useCallback((direction: 'up' | 'down') => {
+        if (!socketRef.current || !round || round.state !== 'open' || myBet || placingBet) return
+        setPlacingBet(true)
+        socketRef.current.emit('PLACE_BET', {
+            roundId: round.id,
+            direction,
+            amount: Number(stake),
+            mode,
+        })
+    }, [round, myBet, placingBet, stake, mode])
 
-    const handleBet = async (direction: 'UP' | 'DOWN') => {
-        if (gameState !== 'OPEN' || isBetting) return
-        setIsBetting(true);
-        try {
-            await apiRequest('/games/prediction/place', {
-                method: 'POST',
-                body: JSON.stringify({
-                    amount: Number(stake),
-                    mode,
-                    market: 'EUR/USD',
-                    direction,
-                    windowMinutes: 5
-                })
-            });
-            setSelectedDirection(direction)
-        } catch (err: any) {
-            if (err.message?.includes('Authentication required')) {
-                alert('Please login first to place a demo prediction.');
-                return;
-            }
-            alert(err.message || 'Failed to place prediction');
-        } finally {
-            setIsBetting(false);
-        }
-    }
+    // ── Price change display ───────────────────────────────────────────────────
+    const priceChange = round?.closePrice != null && round.entryPrice
+        ? ((round.closePrice - round.entryPrice) / round.entryPrice * 100).toFixed(3)
+        : null
+
+    const canBet = round?.state === 'open' && !myBet && !placingBet && connected
 
     return (
         <AuthGuarded>
-            <div className="space-y-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                        <TrendingIcons /> Up & Down
+            {/* Background flash */}
+            <div
+                className="fixed inset-0 pointer-events-none z-10 transition-opacity duration-700"
+                style={{
+                    background: flash === 'up' ? 'rgba(16,185,129,0.12)' : flash === 'down' ? 'rgba(239,68,68,0.12)' : 'transparent',
+                    opacity: flash ? 1 : 0,
+                }}
+            />
+
+            <div className="space-y-4 max-w-2xl mx-auto pb-8">
+
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-black text-white flex items-center gap-2">
+                        <TrendingUp className="text-emerald-400" size={24} /> Up & Down
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-1">Predict the market direction in 5 minutes</p>
-                </div>
-
-                <div className="flex items-center gap-4 bg-card/50 p-3 rounded-xl border border-white/5">
-                    <ModeToggle />
-                    <div className="w-px h-8 bg-white/10" />
-                    <div className="flex flex-col items-center px-4">
-                        <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Timer</span>
-                        <span className={`text-2xl font-mono font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                            {formatTime(timeLeft)}
-                        </span>
+                    <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-500'}`} />
+                        <ModeToggle />
                     </div>
                 </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Main Game Area */}
-                <div className="lg:col-span-8 space-y-6">
-
-                    {/* Price Display */}
-                    <div className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent opacity-20" />
-                        <h3 className="text-muted-foreground uppercase text-sm font-medium mb-2">EUR/USD Price</h3>
-                        <div className="text-6xl font-black text-white tracking-tighter flex items-center gap-2">
-                            {price.toFixed(4)}
-                            {price > startPrice ? (
-                                <ArrowUp className="text-emerald-500" size={32} />
-                            ) : (
-                                <ArrowDown className="text-red-500" size={32} />
-                            )}
+                {/* History Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {history.length === 0 && (
+                        <span className="text-xs text-zinc-600 italic px-1">No results yet</span>
+                    )}
+                    {[...history].reverse().slice(0, 10).map((h, i) => (
+                        <div
+                            key={i}
+                            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border font-bold text-xs ${h.direction === 'up'
+                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                    : h.direction === 'down'
+                                        ? 'bg-red-500/20 border-red-500/50 text-red-400'
+                                        : 'bg-zinc-500/20 border-zinc-500/50 text-zinc-400'
+                                }`}
+                        >
+                            {h.direction === 'up' ? '↑' : h.direction === 'down' ? '↓' : '–'}
                         </div>
-                        <div className="mt-4 text-xs font-mono text-muted-foreground uppercase tracking-widest opacity-50">Live Market Feed</div>
+                    ))}
+                </div>
+
+                {/* Main Game Card */}
+                <div className="bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+
+                    {/* State Banner */}
+                    <div className={`px-4 py-2 text-center text-xs font-bold uppercase tracking-widest ${round?.state === 'open'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : round?.state === 'locked'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-indigo-500/20 text-indigo-400'
+                        }`}>
+                        {round?.state === 'open' ? '🟢 Accepting bets'
+                            : round?.state === 'locked' ? '🔒 Locked — fetching result...'
+                                : round?.state === 'result' ? '📊 Round result'
+                                    : '⏳ Waiting for round...'}
                     </div>
 
-                    {/* Betting Controls */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <button
-                            onClick={() => handleBet('UP')}
-                            disabled={gameState !== 'OPEN' || isBetting}
-                            className={`h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${selectedDirection === 'UP'
-                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]'
-                                : 'bg-card border-border hover:border-emerald-500/50 hover:bg-emerald-500/5 text-muted-foreground hover:text-emerald-400'
-                                } ${gameState !== 'OPEN' || isBetting ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
-                        >
-                            {isBetting && selectedDirection === 'UP' ? <Loader2 className="animate-spin" /> : <ArrowUp size={48} strokeWidth={3} />}
-                            <span className="text-2xl font-bold">UP</span>
-                            {selectedDirection === 'UP' && <span className="text-xs bg-emerald-500 text-black px-2 py-0.5 rounded-full font-bold">SELECTED</span>}
-                        </button>
+                    {/* Price + Timer */}
+                    <div className="p-6 flex flex-col items-center gap-4">
+                        <div className="text-xs uppercase tracking-widest text-zinc-500 font-bold">
+                            {round?.market ?? 'USD/KES'}
+                        </div>
 
+                        <div className="text-5xl font-black text-white tabular-nums tracking-tighter">
+                            {round?.entryPrice != null ? round.entryPrice.toFixed(4) : '—'}
+                        </div>
+
+                        {/* RESULT: show price change */}
+                        {round?.state === 'result' && lastResult && (
+                            <div className={`flex flex-col items-center gap-1 ${lastResult.direction === 'up' ? 'text-emerald-400' : lastResult.direction === 'down' ? 'text-red-400' : 'text-zinc-400'}`}>
+                                <div className="flex items-center gap-2 text-4xl">
+                                    {lastResult.direction === 'up' ? <ArrowUp size={48} strokeWidth={3} /> :
+                                        lastResult.direction === 'down' ? <ArrowDown size={48} strokeWidth={3} /> :
+                                            <span className="text-2xl">—</span>}
+                                </div>
+                                <div className="text-sm font-mono">
+                                    {lastResult.entryPrice.toFixed(4)} → {lastResult.closePrice.toFixed(4)}
+                                    {priceChange && <span className="ml-1 opacity-60">({priceChange}%)</span>}
+                                </div>
+                                {lastResult.userWon !== null && (
+                                    <div className={`mt-1 text-lg font-black px-4 py-1 rounded-full ${lastResult.userWon
+                                            ? 'bg-emerald-500/20 text-emerald-400'
+                                            : 'bg-red-500/20 text-red-400'
+                                        }`}>
+                                        {lastResult.userWon
+                                            ? `🎉 You won KES ${(Number(stake) * PAYOUT).toFixed(2)}!`
+                                            : `😔 You lost KES ${stake}`}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* OPEN: show countdown ring */}
+                        {round?.state === 'open' && (
+                            <CountdownRing secondsLeft={secondsLeft} total={TOTAL_SECONDS} />
+                        )}
+
+                        {/* LOCKED: spinner */}
+                        {round?.state === 'locked' && (
+                            <div className="flex items-center gap-2 text-amber-400 animate-pulse">
+                                <Loader2 className="animate-spin" size={20} />
+                                <span className="text-sm font-bold">Fetching close price...</span>
+                            </div>
+                        )}
+
+                        {/* My bet badge */}
+                        {myBet && (
+                            <div className={`px-4 py-1.5 rounded-full text-sm font-bold border ${myBet.direction === 'up'
+                                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                                    : 'bg-red-500/10 border-red-500/50 text-red-400'
+                                }`}>
+                                ✓ You bet {myBet.direction.toUpperCase()} — KES {myBet.amount}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bet Buttons */}
+                    <div className="grid grid-cols-2 gap-3 px-6 pb-4">
                         <button
-                            onClick={() => handleBet('DOWN')}
-                            disabled={gameState !== 'OPEN' || isBetting}
-                            className={`h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-300 ${selectedDirection === 'DOWN'
-                                ? 'bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.2)]'
-                                : 'bg-card border-border hover:border-red-500/50 hover:bg-red-500/5 text-muted-foreground hover:text-red-400'
-                                } ${gameState !== 'OPEN' || isBetting ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                            onClick={() => handleBet('up')}
+                            disabled={!canBet}
+                            className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 text-lg font-black
+                                ${myBet?.direction === 'up'
+                                    ? 'bg-emerald-500/30 border-emerald-500 text-emerald-300'
+                                    : canBet
+                                        ? 'bg-emerald-500/10 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/20'
+                                        : 'bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50'
+                                }`}
                         >
-                            {isBetting && selectedDirection === 'DOWN' ? <Loader2 className="animate-spin" /> : <ArrowDown size={48} strokeWidth={3} />}
-                            <span className="text-2xl font-bold">DOWN</span>
-                            {selectedDirection === 'DOWN' && <span className="text-xs bg-red-500 text-black px-2 py-0.5 rounded-full font-bold">SELECTED</span>}
+                            {placingBet && myBet === null
+                                ? <Loader2 className="animate-spin" size={20} />
+                                : <ArrowUp size={28} strokeWidth={3} />}
+                            UP
+                        </button>
+                        <button
+                            onClick={() => handleBet('down')}
+                            disabled={!canBet}
+                            className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 text-lg font-black
+                                ${myBet?.direction === 'down'
+                                    ? 'bg-red-500/30 border-red-500 text-red-300'
+                                    : canBet
+                                        ? 'bg-red-500/10 border-red-500/60 text-red-400 hover:bg-red-500/20'
+                                        : 'bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50'
+                                }`}
+                        >
+                            {placingBet && myBet === null
+                                ? <Loader2 className="animate-spin" size={20} />
+                                : <ArrowDown size={28} strokeWidth={3} />}
+                            DOWN
                         </button>
                     </div>
 
-                    <div className="bg-card border border-border rounded-xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <label className="text-sm font-medium text-muted-foreground">Stake Amount</label>
-                            <span className="text-sm font-bold text-white">Min: KSh 10</span>
+                    {/* Stake Panel */}
+                    <div className="px-6 pb-6 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Stake (KES)</span>
+                            <span className="text-xs text-zinc-500">Win: <span className="text-white font-bold">KES {(Number(stake) * PAYOUT).toFixed(2)}</span></span>
                         </div>
-                        <div className="flex gap-2">
-                            {['100', '500', '1000', '5000'].map(amt => (
+                        <div className="grid grid-cols-4 gap-2">
+                            {STAKE_PRESETS.map(amt => (
                                 <button
                                     key={amt}
                                     onClick={() => setStake(amt)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${stake === amt
-                                        ? 'bg-primary text-white border-primary'
-                                        : 'bg-transparent border-white/10 text-muted-foreground hover:border-white/30'
-                                        }`}
+                                    disabled={!!myBet}
+                                    className={`py-2 rounded-xl text-sm font-bold border transition-all ${stake === amt
+                                            ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400'
+                                            : 'bg-white/5 border-white/5 text-zinc-400 hover:border-white/20'
+                                        } disabled:opacity-40 disabled:cursor-not-allowed`}
                                 >
                                     {amt}
                                 </button>
                             ))}
-                            <input
-                                type="number"
-                                value={stake}
-                                onChange={(e) => setStake(e.target.value)}
-                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-primary text-right font-mono"
-                            />
                         </div>
+                        <input
+                            type="number"
+                            value={stake}
+                            onChange={e => setStake(e.target.value)}
+                            disabled={!!myBet}
+                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-center text-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+                        />
+                    </div>
+
+                    {/* Info footer */}
+                    <div className="px-6 pb-5 flex items-center justify-between text-xs text-zinc-600">
+                        <span>Payout: {PAYOUT}× • House edge: 10%</span>
+                        {balance !== null && <span>Balance: KES {balance.toFixed(2)}</span>}
                     </div>
                 </div>
-
-                {/* Sidebar / History */}
-                <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-card border border-border rounded-2xl p-6">
-                        <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-6">
-                            <History className="text-accent" /> Recent Results
-                        </h3>
-
-                        <div className="space-y-3">
-                            {history.length === 0 && (
-                                <div className="text-center text-muted-foreground py-8">No recent games</div>
-                            )}
-                            {history.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`flex items-center justify-center w-8 h-8 rounded-full font-bold ${item.result === 'UP' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-                                            }`}>
-                                            {item.result === 'UP' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                                        </span>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium text-white">Closed @ {item.price.toFixed(2)}</span>
-                                            <span className="text-xs text-muted-foreground">{item.time}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-indigo-900/50 to-violet-900/50 border border-indigo-500/30 rounded-2xl p-6 relative overflow-hidden">
-                        <div className="relative z-10">
-                            <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-2">
-                                <Trophy className="text-yellow-400" /> Winning Rules
-                            </h3>
-                            <ul className="text-sm text-indigo-200 space-y-2 mt-4">
-                                <li className="flex gap-2">• <span>Majority Choice: <b className="text-white">LOSE 100%</b></span></li>
-                                <li className="flex gap-2">• <span>Minority Choice: <b className="text-white">WIN +50%</b></span></li>
-                            </ul>
-                            <p className="text-xs text-indigo-300/60 mt-4 italic">
-                                *Pesaki earns from the imbalance.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
             </div>
         </AuthGuarded>
     )
-}
-
-function TrendingIcons() {
-    return <ArrowUp className="text-emerald-500" />
 }

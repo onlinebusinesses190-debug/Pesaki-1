@@ -36,7 +36,7 @@ export const TradingChart = ({
                 },
                 timeScale: {
                     timeVisible: true,
-                    secondsVisible: false,
+                    secondsVisible: true,
                 }
             })
             chartRef.current = chart

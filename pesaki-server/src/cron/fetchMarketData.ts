@@ -55,10 +55,14 @@ export const fetchMarketData = async () => {
     logger.error({ error: err.message }, 'Error fetching live market data - using fallbacks');
     
     // Provide some minimal fallbacks so the app isn't broken
-    await redis.set('market:EUR/USD', '1.0850', { ex: 360 });
-    await redis.set('market:USD/KES', '132.50', { ex: 360 });
-    await redis.set('market:GBP/USD', '1.2640', { ex: 360 });
-    await redis.set('market:XAU/USD', '2165.40', { ex: 360 });
+    try {
+      await redis.set('market:EUR/USD', '1.0850', { ex: 360 });
+      await redis.set('market:USD/KES', '132.50', { ex: 360 });
+      await redis.set('market:GBP/USD', '1.2640', { ex: 360 });
+      await redis.set('market:XAU/USD', '2165.40', { ex: 360 });
+    } catch (redisErr: any) {
+      logger.error({ error: redisErr.message }, 'Failed to set fallback market data in Redis');
+    }
   }
 
   // 2. Fetch NSE Data (Mocked)

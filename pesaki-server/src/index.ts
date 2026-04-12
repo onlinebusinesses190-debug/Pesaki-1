@@ -5,6 +5,7 @@ import { env } from './config/env';
 import { logger } from './utils/logger';
 import { initSocket } from './socket';
 import { startNewRound } from './games/aviator/engine';
+import { startUpDownRounds } from './games/updown/engine';
 import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
@@ -15,10 +16,10 @@ const startServer = async () => {
     
     // Fastify CORS
     await server.register(cors, {
-      origin: [
-        'http://localhost:3000',
-        'https://pesaki.vercel.app',
-      ],
+      origin: (_origin, cb) => {
+        // Allow all origins for dev, or specify a list for prod
+        cb(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     });
@@ -33,6 +34,7 @@ const startServer = async () => {
     
     // Initialize Game loops
     startNewRound();
+    startUpDownRounds();
     
     // Initialize Schedule Jobs
     initCronJobs();

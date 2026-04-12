@@ -213,13 +213,13 @@ create table public.spin_prizes (
 
 -- Sample data
 insert into public.spin_prizes (name, value, weight, image) values
-('Loss', 0, 40, '/spin/loss.png'),
-('Cherry', 0.5, 25, '/spin/cherry.png'),
-('Lemon', 1.0, 15, '/spin/lemon.png'),
-('Orange', 2.0, 10, '/spin/orange.png'),
-('Bell', 5.0, 5, '/spin/bell.png'),
-('7x7', 10.0, 3, '/spin/777.png'),
-('Jackpot', 50.0, 2, '/spin/jackpot.png');
+('Loss', 0, 35, null),
+('0.5', 0.5, 25, null),
+('Loss', 0, 15, null),
+('1.5', 1.5, 10, null),
+('Loss', 0, 10, null),
+('1', 1.0, 4, null),
+('5', 5.0, 1, null);
 
 alter table public.spin_prizes enable row level security;
 create policy "Prizes public read" on public.spin_prizes for select using (true);

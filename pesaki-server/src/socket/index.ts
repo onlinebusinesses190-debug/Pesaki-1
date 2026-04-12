@@ -2,16 +2,14 @@ import { Server, Socket } from 'socket.io';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import { setupAviatorNamespace } from './namespaces/aviator';
+import { setupUpDownNamespace } from './namespaces/updown';
 
 export let io: Server;
 
 export const initSocket = (server: any) => {
   io = new Server(server, {
     cors: {
-      origin: [
-        'http://localhost:3000',
-        'https://pesaki.vercel.app',
-      ],
+      origin: (_origin: any, cb: any) => cb(null, true),
       methods: ['GET', 'POST'],
       credentials: true
     },
@@ -42,6 +40,10 @@ export const initSocket = (server: any) => {
   // Apply middleware and setup to the Aviator namespace specifically
   io.of('/aviator').use(socketAuthMiddleware);
   setupAviatorNamespace(io);
+
+  // Apply middleware and setup to the Up/Down namespace
+  io.of('/updown').use(socketAuthMiddleware);
+  setupUpDownNamespace(io);
 
   io.on('connection', (socket: Socket) => {
     logger.info({ socketId: socket.id, userId: socket.data.user.id }, 'Socket connected');

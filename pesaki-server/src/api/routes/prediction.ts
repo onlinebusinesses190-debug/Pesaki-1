@@ -1,15 +1,17 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { placePrediction, settlePredictions } from '../../games/prediction/engine';
+import { getUpDownState } from '../../games/updown/engine';
 import { verifyAuth } from '../../middleware/auth';
 import { logger } from '../../utils/logger';
+import { supabase } from '../../lib/supabase';
 
 const predictionSchema = z.object({
   amount: z.number().positive(),
   mode: z.enum(['real', 'demo']),
   market: z.string(),
   direction: z.enum(['UP', 'DOWN']),
-  windowMinutes: z.number().min(1),
+  windowMinutes: z.number().positive(),
 });
 
 export const predictionRoutes = async (fastify: FastifyInstance) => {
@@ -33,5 +35,38 @@ export const predictionRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/settle', { preHandler: [verifyAuth] }, async (_, reply) => {
      await settlePredictions();
      return reply.send({ success: true });
+  });
+
+  // Get pending predictions for user
+  fastify.get('/pending', { preHandler: [verifyAuth] }, async (request, reply) => {
+    try {
+      const { data, error } = await supabase
+        .from('predictions')
+        .select('*')
+        .eq('user_id', request.user!.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return reply.send({ success: true, data });
+    } catch (err: any) {
+      logger.error(err, 'Error fetching pending predictions');
+      return reply.code(500).send({ success: false, error: 'Database error' });
+    }
+  });
+  // Get current round state (for users who join mid-round)
+  fastify.get('/current', async (_, reply) => {
+    const state = getUpDownState();
+    const round = state.round;
+    const secondsLeft = round && round.state === 'open'
+      ? Math.max(0, Math.ceil((new Date(round.locksAt).getTime() - Date.now()) / 1000))
+      : 0;
+    return reply.send({ success: true, data: { round, secondsLeft, history: state.history } });
+  });
+
+  // Get last 10 settled rounds
+  fastify.get('/history', async (_, reply) => {
+    const { history } = getUpDownState();
+    return reply.send({ success: true, data: history });
   });
 };

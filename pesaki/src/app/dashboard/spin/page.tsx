@@ -67,7 +67,7 @@ export default function MarketSpinPage() {
             const result = data.data
             const outcomeSegmentIndex: number = result.prizeIndex
             const segmentAngle = 360 / prizes.length
-            const targetAngle = 360 - (outcomeSegmentIndex * segmentAngle)
+            const targetAngle = 360 - (outcomeSegmentIndex * segmentAngle) - (segmentAngle / 2)
             const fullSpins = 5 * 360
             const finalRotation = rotation + fullSpins + ((targetAngle - (rotation % 360) + 360) % 360)
 
