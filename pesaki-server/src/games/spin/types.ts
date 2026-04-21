@@ -1,15 +1,15 @@
-export interface SpinPrize {
+export interface AllocationOutcome {
   id: string;
   name: string;
   value: number;
   weight: number;
 }
 
-export interface SpinResult {
+export interface AllocationResult {
   userId: string;
-  betAmount: number;
-  prizeId: string;
-  prizeValue: number;
+  allocationAmount: number;
+  outcomeId: string;
+  outcomeValue: number;
   mode: 'real' | 'demo';
   timestamp: Date;
 }

@@ -21,7 +21,7 @@ export interface UpDownRound {
   resultsAt: Date;
 }
 
-interface ActiveBet {
+interface MarketPosition {
   userId: string;
   direction: 'up' | 'down';
   amount: number;
@@ -43,13 +43,13 @@ const DEFAULT_MARKET = 'USD/KES';
 const OPEN_DURATION   = 10_000; // 10 seconds
 const LOCKED_DURATION =  2_000; //  2 seconds
 const RESULT_DURATION =  3_000; //  3 seconds
-const PAYOUT_MULTIPLIER = 1.9;
+const GROWTH_MULTIPLIER = 1.9;
 const MAX_HISTORY = 20;
 
 // ── State ────────────────────────────────────────────────────────────────────
 
 let currentRound: UpDownRound | null = null;
-let activeBets: Map<string, ActiveBet> = new Map(); // keyed by userId
+let activePositions: Map<string, MarketPosition> = new Map(); // keyed by userId
 const roundHistory: HistoryEntry[] = [];
 
 // ── Public getters ────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ export const getUpDownState = () => ({
 
 // ── Bet placement  ────────────────────────────────────────────────────────────
 
-export const placeBet = async (
+export const placePosition = async (
   userId: string,
   roundId: string,
   direction: 'up' | 'down',
@@ -69,17 +69,17 @@ export const placeBet = async (
   mode: 'real' | 'demo'
 ): Promise<{ success: true; newBalance: number } | { success: false; error: string }> => {
   if (!currentRound || currentRound.state !== 'open') {
-    return { success: false, error: 'Round is not accepting bets' };
+    return { success: false, error: 'Market is not accepting orders' };
   }
   if (currentRound.id !== roundId) {
-    return { success: false, error: 'Round mismatch - please refresh' };
+    return { success: false, error: 'Market ID mismatch - please refresh' };
   }
-  if (activeBets.has(userId)) {
-    return { success: false, error: 'You already placed a bet this round' };
+  if (activePositions.has(userId)) {
+    return { success: false, error: 'You already have an active position this round' };
   }
 
   // Debit wallet
-  const debitRes = await debit(userId, amount, mode, `Up/Down bet (${direction.toUpperCase()}) on ${currentRound.market}`);
+  const debitRes = await debit(userId, amount, mode, `Market Forecast (${direction.toUpperCase()}) on ${currentRound.market}`);
   if (!debitRes.success) {
     return { success: false, error: debitRes.error || 'Insufficient funds' };
   }
@@ -100,12 +100,12 @@ export const placeBet = async (
 
   if (dbErr || !data) {
     // Refund on DB failure
-    await credit(userId, amount, mode, `Refund: Up/Down bet DB error`);
-    return { success: false, error: 'Database error — bet refunded' };
+    await credit(userId, amount, mode, `Refund: Market Forecast DB error`);
+    return { success: false, error: 'Database error — order refunded' };
   }
 
-  activeBets.set(userId, { userId, direction, amount, mode, predictionId: data.id });
-  logger.info({ userId, direction, amount, roundId }, 'Up/Down bet placed');
+  activePositions.set(userId, { userId, direction, amount, mode, predictionId: data.id });
+  logger.info({ userId, direction, amount, roundId }, 'Market position placed');
   return { success: true, newBalance: debitRes.newBalance! };
 };
 
@@ -173,7 +173,7 @@ const startOpen = async () => {
     resultsAt,
   };
 
-  activeBets.clear();
+  activePositions.clear();
 
   const nsp = io.of('/updown');
   nsp.emit('UPDOWN_ROUND_OPEN', {
@@ -232,26 +232,26 @@ const startResult = async (closePrice: number) => {
   currentRound.direction = direction;
   currentRound.closePrice = closePrice;
 
-  const betsArray = Array.from(activeBets.values());
-  let winners = 0;
+  const positionsArray = Array.from(activePositions.values());
+  let successfulTrades = 0;
 
-  for (const bet of betsArray) {
+  for (const pos of positionsArray) {
     if (direction === null) {
       // Void round — refund everyone
-      await credit(bet.userId, bet.amount, bet.mode, `Up/Down Refund — Void round (${currentRound.market})`);
+      await credit(pos.userId, pos.amount, pos.mode, `Market Refund — Void round (${currentRound.market})`);
       await supabase.from('predictions').update({ status: 'cancelled', close_price: closePrice })
-        .eq('id', bet.predictionId);
-    } else if (bet.direction === direction) {
-      // Winner
-      const winAmount = Number((bet.amount * PAYOUT_MULTIPLIER).toFixed(2));
-      await credit(bet.userId, winAmount, bet.mode, `Up/Down Win ${direction.toUpperCase()} on ${currentRound.market} (${PAYOUT_MULTIPLIER}x)`);
+        .eq('id', pos.predictionId);
+    } else if (pos.direction === direction) {
+      // Success
+      const winAmount = Number((pos.amount * GROWTH_MULTIPLIER).toFixed(2));
+      await credit(pos.userId, winAmount, pos.mode, `Market Success ${direction.toUpperCase()} on ${currentRound.market} (${GROWTH_MULTIPLIER}x)`);
       await supabase.from('predictions').update({ status: 'settled', close_price: closePrice })
-        .eq('id', bet.predictionId);
-      winners++;
+        .eq('id', pos.predictionId);
+      successfulTrades++;
     } else {
-      // Loser
+      // Unsuccessful
       await supabase.from('predictions').update({ status: 'settled', close_price: closePrice })
-        .eq('id', bet.predictionId);
+        .eq('id', pos.predictionId);
     }
   }
 
@@ -273,13 +273,13 @@ const startResult = async (closePrice: number) => {
     entryPrice: currentRound.entryPrice,
     closePrice,
     direction,
-    winners,
-    payoutMultiplier: PAYOUT_MULTIPLIER,
+    winners: successfulTrades,
+    payoutMultiplier: GROWTH_MULTIPLIER,
   };
 
   io.of('/updown').emit('UPDOWN_ROUND_RESULT', resultPayload);
 
-  logger.info({ ...resultPayload, totalBets: betsArray.length }, 'Up/Down round RESULT');
+  logger.info({ ...resultPayload, totalPositions: positionsArray.length }, 'Up/Down round RESULT');
 
   setTimeout(startOpen, RESULT_DURATION);
 };

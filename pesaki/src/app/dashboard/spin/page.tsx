@@ -7,7 +7,7 @@ import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
 import { ModeToggle } from '@/components/dashboard/ModeToggle'
 
-type SpinPrize = {
+type AllocationOutcome = {
     id: number
     name: string
     value: number  // multiplier (0 = loss, 0.5 = half back, 1.0 = break even, etc.)
@@ -26,47 +26,47 @@ const PRIZE_COLORS = [
     '#eab308', // Jackpot - yellow
 ]
 
-export default function MarketSpinPage() {
-    const [prizes, setPrizes] = useState<SpinPrize[]>([])
-    const [loadingPrizes, setLoadingPrizes] = useState(true)
-    const [spinning, setSpinning] = useState(false)
+export default function MarketGrowthPage() {
+    const [outcomes, setOutcomes] = useState<AllocationOutcome[]>([])
+    const [loadingOutcomes, setLoadingOutcomes] = useState(true)
+    const [executing, setExecuting] = useState(false)
     const [rotation, setRotation] = useState(0)
-    const [stake, setStake] = useState('100')
-    const [lastWin, setLastWin] = useState<{ name: string; amount: number } | null>(null)
+    const [allocation, setAllocation] = useState('100')
+    const [lastAdjustment, setLastAdjustment] = useState<{ name: string; amount: number } | null>(null)
     const searchParams = useSearchParams()
     const mode = (searchParams.get('mode') === 'real' ? 'real' : 'demo') as 'real' | 'demo'
 
-    // Fetch prizes from the server on mount
+    // Fetch outcomes from the server on mount
     useEffect(() => {
-        const fetchPrizes = async () => {
+        const fetchOutcomes = async () => {
             try {
                 const data = await apiRequest('/games/spin/prizes')
                 if (data.success && data.data) {
-                    setPrizes(data.data)
+                    setOutcomes(data.data)
                 }
             } catch (err) {
-                console.error('Failed to load prizes:', err)
+                console.error('Failed to load outcomes:', err)
             } finally {
-                setLoadingPrizes(false)
+                setLoadingOutcomes(false)
             }
         }
-        fetchPrizes()
+        fetchOutcomes()
     }, [])
 
-    const spinWheel = async () => {
-        if (spinning || prizes.length === 0) return
-        setLastWin(null)
-        setSpinning(true)
+    const executeSelection = async () => {
+        if (executing || outcomes.length === 0) return
+        setLastAdjustment(null)
+        setExecuting(true)
 
         try {
             const data = await apiRequest('/games/spin/play', {
                 method: 'POST',
-                body: JSON.stringify({ amount: Number(stake), mode })
+                body: JSON.stringify({ amount: Number(allocation), mode })
             });
 
             const result = data.data
             const outcomeSegmentIndex: number = result.prizeIndex
-            const segmentAngle = 360 / prizes.length
+            const segmentAngle = 360 / outcomes.length
             const targetAngle = 360 - (outcomeSegmentIndex * segmentAngle) - (segmentAngle / 2)
             const fullSpins = 5 * 360
             const finalRotation = rotation + fullSpins + ((targetAngle - (rotation % 360) + 360) % 360)
@@ -74,27 +74,27 @@ export default function MarketSpinPage() {
             setRotation(finalRotation)
 
             setTimeout(() => {
-                setSpinning(false)
-                setLastWin({ name: result.prizeName, amount: result.winAmount })
+                setExecuting(false)
+                setLastAdjustment({ name: result.prizeName, amount: result.winAmount })
             }, 5000)
         } catch (err: any) {
-            alert(err.message || 'Spin failed');
-            setSpinning(false);
+            alert(err.message || 'Execution failed');
+            setExecuting(false);
         }
     }
 
-    // Build conic-gradient dynamically from prizes
+    // Build conic-gradient dynamically from outcomes
     const buildConicGradient = () => {
-        if (prizes.length === 0) return 'conic-gradient(#333 0deg 360deg)'
-        const segAngle = 360 / prizes.length
-        const stops = prizes.map((p, i) => {
+        if (outcomes.length === 0) return 'conic-gradient(#333 0deg 360deg)'
+        const segAngle = 360 / outcomes.length
+        const stops = outcomes.map((p, i) => {
             const color = PRIZE_COLORS[i % PRIZE_COLORS.length]
             return `${color} ${segAngle * i}deg ${segAngle * (i + 1)}deg`
         })
         return `conic-gradient(${stops.join(', ')})`
     }
 
-    if (loadingPrizes) {
+    if (loadingOutcomes) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="animate-spin text-purple-400" size={40} />
@@ -105,7 +105,7 @@ export default function MarketSpinPage() {
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <Disc className="text-purple-500" /> Market Spin
+                <Disc className="text-purple-500" /> Market Growth Selector
             </h1>
 
             <ModeToggle />
@@ -120,7 +120,7 @@ export default function MarketSpinPage() {
                         className="w-[300px] h-[300px] md:w-[400px] md:h-[400px] rounded-full relative overflow-hidden shadow-[0_0_50px_rgba(139,92,246,0.3)] border-4 border-white/20"
                         style={{
                             transform: `rotate(${rotation}deg)`,
-                            transition: spinning ? 'transform 5s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none',
+                            transition: executing ? 'transform 5s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none',
                         }}
                     >
                         <div
@@ -128,8 +128,8 @@ export default function MarketSpinPage() {
                             style={{ background: buildConicGradient() }}
                         />
 
-                        {prizes.map((prize, i) => {
-                            const segAngle = 360 / prizes.length
+                        {outcomes.map((prize, i) => {
+                            const segAngle = 360 / outcomes.length
                             const rotate = segAngle * i + (segAngle / 2)
                             return (
                                 <div
@@ -154,27 +154,27 @@ export default function MarketSpinPage() {
                 {/* Controls */}
                 <div className="bg-card border border-border rounded-2xl p-6 space-y-8">
                     <div className="text-center space-y-2">
-                        {lastWin !== null && (
-                            <div className={`text-2xl font-bold animate-bounce ${lastWin.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                {lastWin.amount > 0 ? `YOU WON KSh ${lastWin.amount}! 🎉` : `${lastWin.name} – Try Again!`}
+                        {lastAdjustment !== null && (
+                            <div className={`text-2xl font-bold animate-bounce ${lastAdjustment.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                {lastAdjustment.amount > 0 ? `GAIN REALIZED: KSh ${lastAdjustment.amount}! 🎉` : `${lastAdjustment.name} – System Adjustment`}
                             </div>
                         )}
-                        {!spinning && lastWin === null && (
-                            <div className="text-xl font-bold text-white">Ready to Spin?</div>
+                        {!executing && lastAdjustment === null && (
+                            <div className="text-xl font-bold text-white">Execute Allocation?</div>
                         )}
-                        {spinning && (
-                            <div className="text-xl font-bold text-yellow-500 animate-pulse">Spinning...</div>
+                        {executing && (
+                            <div className="text-xl font-bold text-yellow-500 animate-pulse">Processing...</div>
                         )}
                     </div>
 
                     <div className="space-y-4">
-                        <label className="text-sm font-medium text-muted-foreground">Stake Amount</label>
+                        <label className="text-sm font-medium text-muted-foreground">Allocation Amount</label>
                         <div className="grid grid-cols-3 gap-2">
                             {['50', '100', '200', '500', '1000'].map(amt => (
                                 <button
                                     key={amt}
-                                    onClick={() => setStake(amt)}
-                                    className={`py-2 rounded-lg text-sm font-bold border transition-all ${stake === amt
+                                    onClick={() => setAllocation(amt)}
+                                    className={`py-2 rounded-lg text-sm font-bold border transition-all ${allocation === amt
                                         ? 'bg-purple-500/20 border-purple-500 text-purple-400'
                                         : 'bg-white/5 border-transparent hover:bg-white/10'
                                         }`}
@@ -185,37 +185,37 @@ export default function MarketSpinPage() {
                         </div>
                         <input
                             type="number"
-                            value={stake}
-                            onChange={(e) => setStake(e.target.value)}
+                            value={allocation}
+                            onChange={(e) => setAllocation(e.target.value)}
                             className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-center text-xl font-bold"
                         />
                     </div>
 
-                    {/* Prizes legend */}
+                    {/* Allocation Outcomes legend */}
                     <div className="space-y-1">
-                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Prize Table</div>
-                        {prizes.map((p, i) => (
+                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Return Structure</div>
+                        {outcomes.map((p, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: PRIZE_COLORS[i % PRIZE_COLORS.length] }} />
                                     <span className="text-zinc-400">{p.name}</span>
                                 </div>
-                                <span className="text-white font-bold">{p.value === 0 ? 'Loss' : `${p.value}x`}</span>
+                                <span className="text-white font-bold">{p.value === 0 ? 'Adjustment' : `${p.value}x`}</span>
                             </div>
                         ))}
                     </div>
 
                     <button
-                        onClick={spinWheel}
-                        disabled={spinning || prizes.length === 0}
+                        onClick={executeSelection}
+                        disabled={executing || outcomes.length === 0}
                         className="w-full py-4 text-xl font-black rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {spinning ? <Loader2 className="animate-spin" /> : 'SPIN WHEEL'}
+                        {executing ? <Loader2 className="animate-spin" /> : 'EXECUTE ALLOCATION'}
                     </button>
 
                     <div className="text-xs text-center text-muted-foreground">
                         <Sparkles className="inline w-3 h-3 mr-1" />
-                        Prizes are multipliers of your stake
+                        Returns are multipliers of your allocation
                     </div>
                 </div>
             </div>

@@ -36,7 +36,7 @@ interface HistoryEntry {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-const STAKE_PRESETS = ['50', '100', '200', '500']
+const AMOUNT_PRESETS = ['50', '100', '200', '500']
 const PAYOUT = 1.9
 const TOTAL_SECONDS = 10
 
@@ -84,13 +84,13 @@ export default function UpDownGame() {
         closePrice: number
         userWon: boolean | null
     } | null>(null)
-    const [myBet, setMyBet] = useState<{ direction: 'up' | 'down'; amount: number } | null>(null)
-    const [stake, setStake] = useState('100')
-    const [placingBet, setPlacingBet] = useState(false)
+    const [myPosition, setMyPosition] = useState<{ direction: 'up' | 'down'; amount: number } | null>(null)
+    const [amount, setAmount] = useState('100')
+    const [executingOrder, setExecutingOrder] = useState(false)
     const [balance, setBalance] = useState<number | null>(null)
     const [flash, setFlash] = useState<'up' | 'down' | null>(null)
 
-    // ── Track current round id to clear myBet on new round ──────────────────
+    // ── Track current round id to clear myPosition on new round ──────────────────
     const currentRoundIdRef = useRef<string | null>(null)
 
     // ── Connect socket ────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ export default function UpDownGame() {
                 setHistory(data.history)
                 if (data.round && data.round.id !== currentRoundIdRef.current) {
                     currentRoundIdRef.current = data.round.id
-                    setMyBet(null)
+                    setMyPosition(null)
                 }
             })
 
@@ -142,7 +142,7 @@ export default function UpDownGame() {
                 setFlash(null)
                 if (data.roundId !== currentRoundIdRef.current) {
                     currentRoundIdRef.current = data.roundId
-                    setMyBet(null)
+                    setMyPosition(null)
                 }
             })
 
@@ -165,8 +165,8 @@ export default function UpDownGame() {
                     direction: data.direction,
                 } : null)
 
-                const userWon = myBet && data.direction
-                    ? myBet.direction === data.direction
+                const userWon = myPosition && data.direction
+                    ? myPosition.direction === data.direction
                     : null
 
                 setLastResult({
@@ -194,15 +194,15 @@ export default function UpDownGame() {
                 })
             })
 
-            socket.on('BET_CONFIRMED', (data: { roundId: string; direction: string; amount: number; newBalance: number }) => {
-                setMyBet({ direction: data.direction as 'up' | 'down', amount: data.amount })
+            socket.on('POSITION_CONFIRMED', (data: { roundId: string; direction: string; amount: number; newBalance: number }) => {
+                setMyPosition({ direction: data.direction as 'up' | 'down', amount: data.amount })
                 setBalance(data.newBalance)
-                setPlacingBet(false)
+                setExecutingOrder(false)
             })
 
-            socket.on('BET_REJECTED', (data: { error: string }) => {
-                alert(data.error || 'Bet rejected')
-                setPlacingBet(false)
+            socket.on('ORDER_REJECTED', (data: { error: string }) => {
+                alert(data.error || 'Order rejected')
+                setExecutingOrder(false)
             })
         }
 
@@ -214,24 +214,24 @@ export default function UpDownGame() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // ── Bet handler ───────────────────────────────────────────────────────────
-    const handleBet = useCallback((direction: 'up' | 'down') => {
-        if (!socketRef.current || !round || round.state !== 'open' || myBet || placingBet) return
-        setPlacingBet(true)
-        socketRef.current.emit('PLACE_BET', {
+    // ── Order handler ───────────────────────────────────────────────────────────
+    const handleOrder = useCallback((direction: 'up' | 'down') => {
+        if (!socketRef.current || !round || round.state !== 'open' || myPosition || executingOrder) return
+        setExecutingOrder(true)
+        socketRef.current.emit('PLACE_POSITION', {
             roundId: round.id,
             direction,
-            amount: Number(stake),
+            amount: Number(amount),
             mode,
         })
-    }, [round, myBet, placingBet, stake, mode])
+    }, [round, myPosition, executingOrder, amount, mode])
 
     // ── Price change display ───────────────────────────────────────────────────
     const priceChange = round?.closePrice != null && round.entryPrice
         ? ((round.closePrice - round.entryPrice) / round.entryPrice * 100).toFixed(3)
         : null
 
-    const canBet = round?.state === 'open' && !myBet && !placingBet && connected
+    const canPlaceOrder = round?.state === 'open' && !myPosition && !executingOrder && connected
 
     return (
         <AuthGuarded>
@@ -287,7 +287,7 @@ export default function UpDownGame() {
                                 ? 'bg-amber-500/20 text-amber-400'
                                 : 'bg-indigo-500/20 text-indigo-400'
                         }`}>
-                        {round?.state === 'open' ? '🟢 Accepting bets'
+                        {round?.state === 'open' ? '🟢 Accepting orders'
                             : round?.state === 'locked' ? '🔒 Locked — fetching result...'
                                 : round?.state === 'result' ? '📊 Round result'
                                     : '⏳ Waiting for round...'}
@@ -321,8 +321,8 @@ export default function UpDownGame() {
                                             : 'bg-red-500/20 text-red-400'
                                         }`}>
                                         {lastResult.userWon
-                                            ? `🎉 You won KES ${(Number(stake) * PAYOUT).toFixed(2)}!`
-                                            : `😔 You lost KES ${stake}`}
+                                            ? `🎉 Profit realized: KES ${(Number(amount) * PAYOUT).toFixed(2)}!`
+                                            : `😔 Loss incurred: KES ${amount}`}
                                     </div>
                                 )}
                             </div>
@@ -341,66 +341,66 @@ export default function UpDownGame() {
                             </div>
                         )}
 
-                        {/* My bet badge */}
-                        {myBet && (
-                            <div className={`px-4 py-1.5 rounded-full text-sm font-bold border ${myBet.direction === 'up'
+                        {/* My position badge */}
+                        {myPosition && (
+                            <div className={`px-4 py-1.5 rounded-full text-sm font-bold border ${myPosition.direction === 'up'
                                     ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
                                     : 'bg-red-500/10 border-red-500/50 text-red-400'
                                 }`}>
-                                ✓ You bet {myBet.direction.toUpperCase()} — KES {myBet.amount}
+                                ✓ Position placed: {myPosition.direction.toUpperCase()} — KES {myPosition.amount}
                             </div>
                         )}
                     </div>
 
-                    {/* Bet Buttons */}
+                    {/* Order Buttons */}
                     <div className="grid grid-cols-2 gap-3 px-6 pb-4">
                         <button
-                            onClick={() => handleBet('up')}
-                            disabled={!canBet}
+                            onClick={() => handleOrder('up')}
+                            disabled={!canPlaceOrder}
                             className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 text-lg font-black
-                                ${myBet?.direction === 'up'
+                                ${myPosition?.direction === 'up'
                                     ? 'bg-emerald-500/30 border-emerald-500 text-emerald-300'
-                                    : canBet
+                                    : canPlaceOrder
                                         ? 'bg-emerald-500/10 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/20'
                                         : 'bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50'
                                 }`}
                         >
-                            {placingBet && myBet === null
+                            {executingOrder && myPosition === null
                                 ? <Loader2 className="animate-spin" size={20} />
                                 : <ArrowUp size={28} strokeWidth={3} />}
                             UP
                         </button>
                         <button
-                            onClick={() => handleBet('down')}
-                            disabled={!canBet}
+                            onClick={() => handleOrder('down')}
+                            disabled={!canPlaceOrder}
                             className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 text-lg font-black
-                                ${myBet?.direction === 'down'
+                                ${myPosition?.direction === 'down'
                                     ? 'bg-red-500/30 border-red-500 text-red-300'
-                                    : canBet
+                                    : canPlaceOrder
                                         ? 'bg-red-500/10 border-red-500/60 text-red-400 hover:bg-red-500/20'
                                         : 'bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50'
                                 }`}
                         >
-                            {placingBet && myBet === null
+                            {executingOrder && myPosition === null
                                 ? <Loader2 className="animate-spin" size={20} />
                                 : <ArrowDown size={28} strokeWidth={3} />}
                             DOWN
                         </button>
                     </div>
 
-                    {/* Stake Panel */}
+                    {/* Amount Panel */}
                     <div className="px-6 pb-6 space-y-3">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Stake (KES)</span>
-                            <span className="text-xs text-zinc-500">Win: <span className="text-white font-bold">KES {(Number(stake) * PAYOUT).toFixed(2)}</span></span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Amount (KES)</span>
+                            <span className="text-xs text-zinc-500">Target Gain: <span className="text-white font-bold">KES {(Number(amount) * PAYOUT).toFixed(2)}</span></span>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            {STAKE_PRESETS.map(amt => (
+                            {AMOUNT_PRESETS.map(amt => (
                                 <button
                                     key={amt}
-                                    onClick={() => setStake(amt)}
-                                    disabled={!!myBet}
-                                    className={`py-2 rounded-xl text-sm font-bold border transition-all ${stake === amt
+                                    onClick={() => setAmount(amt)}
+                                    disabled={!!myPosition}
+                                    className={`py-2 rounded-xl text-sm font-bold border transition-all ${amount === amt
                                             ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400'
                                             : 'bg-white/5 border-white/5 text-zinc-400 hover:border-white/20'
                                         } disabled:opacity-40 disabled:cursor-not-allowed`}
@@ -411,9 +411,9 @@ export default function UpDownGame() {
                         </div>
                         <input
                             type="number"
-                            value={stake}
-                            onChange={e => setStake(e.target.value)}
-                            disabled={!!myBet}
+                            value={amount}
+                            onChange={e => setAmount(e.target.value)}
+                            disabled={!!myPosition}
                             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-center text-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
                         />
                     </div>

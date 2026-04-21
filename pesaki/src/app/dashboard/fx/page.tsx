@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { TradingChart } from '@/components/fx/TradingChart'
 import { Activity, RefreshCw } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
@@ -27,7 +27,7 @@ const DURATIONS = [
     { label: '5m', val: 5 },
     { label: '24h', val: 1440 }
 ];
-const STAKES = [100, 200, 500, 1000, 2000, 5000];
+const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 // Helper to generate initial chart data
 const generateData = (count: number, basePrice: number) => {
@@ -56,7 +56,7 @@ export default function FXPage() {
     
     const [lotSize, setLotSize] = useState<number>(0.01)
     const [duration, setDuration] = useState<{label: string, val: number}>(DURATIONS[1]) // 10s
-    const [stake, setStake] = useState<number>(100)
+    const [amount, setAmount] = useState<number>(100)
     
     const [loading, setLoading] = useState(false)
     const [tradeError, setTradeError] = useState<string | null>(null)
@@ -67,6 +67,8 @@ export default function FXPage() {
     const ask = currentPrice ? currentPrice + (spread / 2) : 0;
     const bid = currentPrice ? currentPrice - (spread / 2) : 0;
 
+    const targetPriceRef = useRef<number | null>(null);
+
     const fetchPrice = useCallback(async (isInitial = false) => {
         try {
             if (isInitial) setLoading(true)
@@ -74,24 +76,12 @@ export default function FXPage() {
             if (!res.ok) throw new Error('API Error')
             const result = await res.json()
 
-            setCurrentPrice(result.price)
+            targetPriceRef.current = result.price;
 
             if (isInitial) {
+                setCurrentPrice(result.price)
                 const initialHistory = generateData(100, result.price)
                 setData(initialHistory)
-            } else {
-                setData(prev => {
-                    const last = prev[prev.length - 1]
-                    const nextTime = (last.time as number) + 1
-                    const newCandle = {
-                        time: nextTime,
-                        open: last.close,
-                        high: Math.max(last.close, result.price),
-                        low: Math.min(last.close, result.price),
-                        close: result.price
-                    }
-                    return [...prev.slice(1), newCandle]
-                })
             }
         } catch (err) {
             console.error('Fetch error:', err)
@@ -115,8 +105,8 @@ export default function FXPage() {
         fetchPrice(true)
         fetchOpenPositions()
         
-        // 1s update interval for continuous ticking
-        const priceInterval = setInterval(() => fetchPrice(), 1000)
+        // Fetch anchor base price from server every 5s
+        const priceInterval = setInterval(() => fetchPrice(false), 5000)
         const posInterval = setInterval(() => fetchOpenPositions(), 5000) 
         
         return () => {
@@ -124,6 +114,52 @@ export default function FXPage() {
             clearInterval(posInterval)
         }
     }, [fetchPrice, fetchOpenPositions])
+
+    // Generate high-frequency organic ticks locally around the server anchor 
+    useEffect(() => {
+        const tickInterval = setInterval(() => {
+            setData(prev => {
+                if (prev.length === 0 || !targetPriceRef.current) return prev;
+                
+                const last = prev[prev.length - 1];
+                const target = targetPriceRef.current;
+                
+                const maxVol = target * 0.00015; // 0.015% max noise per tick
+                const noise = (Math.random() - 0.5) * maxVol * 2;
+                
+                // Elastic pull towards the real server price
+                const pull = (target - last.close) * 0.15; 
+                
+                let delta = noise + pull;
+                // Clamp massive server-side jumps so the chart rallies organically instead of glitching
+                const maxDelta = target * 0.0005; 
+                if (delta > maxDelta) delta = maxDelta;
+                if (delta < -maxDelta) delta = -maxDelta;
+                
+                const nextPrice = last.close + delta;
+                
+                const open = last.close;
+                const close = nextPrice;
+                const high = Math.max(open, close) + Math.random() * (maxVol * 0.5);
+                const low = Math.min(open, close) - Math.random() * (maxVol * 0.5);
+
+                // Update UI state synchronously with the tick
+                setCurrentPrice(close);
+
+                const newCandle = {
+                    time: (last.time as number) + 1,
+                    open,
+                    high,
+                    low,
+                    close
+                };
+
+                return [...prev.slice(1), newCandle];
+            });
+        }, 1000);
+
+        return () => clearInterval(tickInterval);
+    }, []);
 
     const handleTrade = async (direction: 'buy' | 'sell') => {
         if (!currentPrice) return
@@ -134,7 +170,7 @@ export default function FXPage() {
             const res = await apiRequest('/games/prediction/place', {
                 method: 'POST',
                 body: JSON.stringify({
-                    amount: stake,
+                    amount: amount,
                     mode,
                     market: pair,
                     direction: direction === 'buy' ? 'UP' : 'DOWN',
@@ -247,15 +283,15 @@ export default function FXPage() {
                             </div>
                         </div>
 
-                        {/* Stake */}
+                        {/* Amount */}
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Stake (KES)</label>
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Amount (KES)</label>
                             <div className="grid grid-cols-3 gap-2">
-                                {STAKES.map(v => (
+                                {AMOUNTS.map(v => (
                                     <button 
                                         key={v}
-                                        onClick={() => setStake(v)}
-                                        className={`py-2 rounded text-sm font-medium transition-colors ${stake === v ? 'bg-[#dcb13c] text-black' : 'bg-[#181d29] text-gray-400 hover:bg-[#202636]'}`}
+                                        onClick={() => setAmount(v)}
+                                        className={`py-2 rounded text-sm font-medium transition-colors ${amount === v ? 'bg-[#dcb13c] text-black' : 'bg-[#181d29] text-gray-400 hover:bg-[#202636]'}`}
                                     >
                                         {v.toLocaleString()}
                                     </button>

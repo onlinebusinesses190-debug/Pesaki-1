@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pesaki | Play & Win",
-  description: "The premier online entertainment platform where you can play games to win real money.",
+  title: "Pesaki | Market & Grow",
+  description: "The premier marketing platform where you can analyze markets and grow faster.",
   manifest: "/site.webmanifest",
 };
 

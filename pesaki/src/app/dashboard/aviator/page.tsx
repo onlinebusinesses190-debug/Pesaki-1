@@ -158,7 +158,7 @@ export default function AviatorPage() {
                                 animate={{ y: 0, opacity: 1 }}
                                 className="absolute top-[20%] left-1/2 -translate-x-1/2 bg-green-500 text-black px-8 py-3 rounded-2xl font-black text-2xl shadow-[0_0_40px_rgba(34,197,94,0.6)] z-50 pointer-events-none"
                             >
-                                WON: KSh {(parseFloat(betAmount) * cashOutMultiplier).toFixed(2)}
+                                GAIN: KSh {(parseFloat(betAmount) * cashOutMultiplier).toFixed(2)}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -175,7 +175,7 @@ export default function AviatorPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Bet Amount</label>
+                        <label className="text-sm font-medium text-muted-foreground">Allocation Amount</label>
                         <div className="flex gap-2">
                             <button onClick={() => setBetAmount(String(Math.max(10, parseInt(betAmount) - 10)))} className="p-2 border border-white/10 rounded-lg hover:bg-white/5">-</button>
                             <input
@@ -193,7 +193,7 @@ export default function AviatorPage() {
                                 onClick={handleCashOut}
                                 className="w-full h-20 bg-orange-500 hover:bg-orange-400 text-black font-black text-2xl rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all active:scale-95 flex flex-col items-center justify-center p-1"
                             >
-                                <span>CASH OUT</span>
+                                <span>REALIZE GAIN</span>
                                 <span className="text-sm font-medium opacity-80">
                                     {(parseFloat(betAmount) * multiplier).toFixed(0)} KSh
                                 </span>
@@ -204,7 +204,7 @@ export default function AviatorPage() {
                                 disabled={status !== 'WAITING' || isBetting}
                                 className="w-full h-20 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-2xl rounded-xl shadow-[0_0_30px_rgba(22,163,74,0.4)] transition-all active:scale-95 border-b-4 border-green-800 flex items-center justify-center gap-2"
                             >
-                                {isBetting ? <Loader2 className="animate-spin" /> : 'BET'}
+                                {isBetting ? <Loader2 className="animate-spin" /> : 'ALLOCATE'}
                             </button>
                         )}
                     </div>

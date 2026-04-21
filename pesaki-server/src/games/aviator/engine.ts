@@ -7,7 +7,7 @@ import { AviatorRound, AviatorBet } from './types';
 import { credit, debit } from '../../wallet/service';
 
 let currentRound: AviatorRound | null = null;
-let activeBets: Map<string, AviatorBet> = new Map();
+let activeOrders: Map<string, AviatorBet> = new Map();
 let currentMultiplier = 1.0;
 let flightInterval: NodeJS.Timeout | null = null;
 const TICK_RATE = 100; // 100ms
@@ -16,54 +16,54 @@ const WAITING_TIME = 5000; // 5s wait between rounds
 export const getAviatorState = () => ({
   round: currentRound,
   multiplier: currentMultiplier,
-  activeBets: Array.from(activeBets.entries()),
+  activeOrders: Array.from(activeOrders.entries()),
 });
 
-export const placeBet = async (userId: string, amount: number, mode: 'real' | 'demo') => {
+export const placeOrder = async (userId: string, amount: number, mode: 'real' | 'demo') => {
   if (currentRound?.status !== 'WAITING') {
-    throw new Error('Round is already in progress');
+    throw new Error('Market is already in progress');
   }
-  if (activeBets.has(userId)) {
-    throw new Error('You already placed a bet this round');
+  if (activeOrders.has(userId)) {
+    throw new Error('You already have an active allocation this round');
   }
 
   // Deduct from wallet first
-  const debitRes = await debit(userId, amount, mode, 'Aviator Bet');
+  const debitRes = await debit(userId, amount, mode, 'Market Allocation');
   if (!debitRes.success) {
     throw new Error(debitRes.error || 'Insufficient funds');
   }
   
-  const bet: AviatorBet = { userId, amount, mode, cashedOut: false };
-  activeBets.set(userId, bet);
-  return { bet, newBalance: debitRes.newBalance };
+  const order: AviatorBet = { userId, amount, mode, cashedOut: false };
+  activeOrders.set(userId, order);
+  return { order, newBalance: debitRes.newBalance };
 };
 
-export const cashOut = async (userId: string) => {
+export const realizeGain = async (userId: string) => {
   if (currentRound?.status !== 'FLYING') {
-    throw new Error('Can only cash out while flying');
+    throw new Error('Can only realize gain while growing');
   }
 
-  const bet = activeBets.get(userId);
-  if (!bet || bet.cashedOut) {
-    throw new Error('No active bet found or already cashed out');
+  const order = activeOrders.get(userId);
+  if (!order || order.cashedOut) {
+    throw new Error('No active allocation found or already realized');
   }
 
-  // Calculate winnings based on CURRENT multiplier to avoid spoofing
-  const cashoutMultiplier = currentMultiplier;
-  const winAmount = Number((bet.amount * cashoutMultiplier).toFixed(2));
+  // Calculate returns based on CURRENT multiplier to avoid spoofing
+  const realizedMultiplier = currentMultiplier;
+  const gainAmount = Number((order.amount * realizedMultiplier).toFixed(2));
   
-  bet.cashedOut = true;
-  bet.cashoutMultiplier = cashoutMultiplier;
-  bet.cashoutAmount = winAmount;
+  order.cashedOut = true;
+  order.cashoutMultiplier = realizedMultiplier;
+  order.cashoutAmount = gainAmount;
 
   // Credit user wallet
-  const result = await credit(userId, winAmount, bet.mode, `Aviator Win (x${cashoutMultiplier})`);
+  const result = await credit(userId, gainAmount, order.mode, `Market Gain (x${realizedMultiplier})`);
   
   if (!result.success) {
-    logger.error({ userId, winAmount }, 'Failed to credit player cashout!');
+    logger.error({ userId, gainAmount }, 'Failed to credit player gain!');
   }
 
-  return { multiplier: cashoutMultiplier, winAmount, newBalance: result.newBalance };
+  return { multiplier: realizedMultiplier, winAmount: gainAmount, newBalance: result.newBalance };
 };
 
 const tickFlight = () => {
@@ -75,13 +75,13 @@ const tickFlight = () => {
   currentMultiplier = Math.pow(Math.E, 0.06 * (elapsedTime / 1000));
 
   if (currentMultiplier >= currentRound.crashPoint) {
-    crashRound();
+    closeMarket();
   } else {
     io.of('/aviator').emit('MULTIPLIER_TICK', { multiplier: currentMultiplier.toFixed(2) });
   }
 };
 
-const startFlying = () => {
+const startGrowing = () => {
   if (!currentRound) return;
   
   currentRound.status = 'FLYING';
@@ -96,7 +96,7 @@ const startFlying = () => {
   flightInterval = setInterval(tickFlight, TICK_RATE);
 };
 
-const crashRound = () => {
+const closeMarket = () => {
   if (flightInterval) clearInterval(flightInterval);
   if (!currentRound) return;
 
@@ -107,9 +107,9 @@ const crashRound = () => {
     serverSeed: currentRound.serverSeed, // Reveal server seed for verification
   });
   
-  // Clean up lost bets here (e.g. logging to database if necessary)
-  const losers = Array.from(activeBets.values()).filter(b => !b.cashedOut);
-  logger.info({ crashedAt: currentRound.crashPoint, losers: losers.length }, 'Round crashed');
+  // Clean up lost allocations here
+  const unsuccessful = Array.from(activeOrders.values()).filter(b => !b.cashedOut);
+  logger.info({ closedAt: currentRound.crashPoint, unsuccessful: unsuccessful.length }, 'Market closed');
   
   setTimeout(startNewRound, WAITING_TIME);
 };
@@ -128,7 +128,7 @@ export const startNewRound = () => {
   };
 
   currentMultiplier = 1.0;
-  activeBets.clear();
+  activeOrders.clear();
 
   io.of('/aviator').emit('ROUND_WAITING', {
     roundId: currentRound.id,
@@ -136,7 +136,7 @@ export const startNewRound = () => {
     waitTime: WAITING_TIME
   });
 
-  logger.info({ roundId: currentRound.id, crashPoint: currentRound.crashPoint }, 'New Aviator round waiting');
+  logger.info({ roundId: currentRound.id, crashPoint: currentRound.crashPoint }, 'New market session opening');
 
-  setTimeout(startFlying, WAITING_TIME);
+  setTimeout(startGrowing, WAITING_TIME);
 };

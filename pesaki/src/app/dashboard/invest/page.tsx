@@ -6,7 +6,7 @@ import { AuthGuarded } from '@/components/AuthGuarded'
 import {
     TrendingUp, TrendingDown, Building2,
     ArrowUp, ArrowDown, Search,
-    RefreshCw, CircleDot, AlertCircle, Wifi, WifiOff,
+    RefreshCw, CircleDot, AlertCircle, Wifi, WifiOff, Moon, Clock,
 } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
 import { toast } from 'sonner'
@@ -145,7 +145,7 @@ export default function InvestmentPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedStock, setSelectedStock] = useState<NseStock | null>(null)
     const [prediction, setPrediction] = useState<'HIGH' | 'LOW' | null>(null)
-    const [stake, setStake] = useState('1000')
+    const [amount, setAmount] = useState('1000')
     const [isPlacing, setIsPlacing] = useState(false)
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ export default function InvestmentPage() {
                 body: JSON.stringify({
                     symbol: selectedStock.symbol,
                     direction: prediction,
-                    amount: Number(stake),
+                    amount: Number(amount),
                     mode: 'invest',
                     entryPrice: selectedStock.price
                 })
@@ -298,6 +298,24 @@ export default function InvestmentPage() {
                                 <code className="font-mono bg-white/10 px-1 rounded">RAPIDAPI_KEY=your_key_here</code>
                             </p>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Market Closed Notice ── */}
+            {!loading && !marketOpen && (
+                <div className="flex items-start gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
+                    <Moon size={18} className="mt-0.5 flex-shrink-0 text-blue-400" />
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-blue-300">NSE Market is Currently Closed</p>
+                        <p className="text-xs mt-0.5 text-blue-400/70 leading-relaxed">
+                            The Nairobi Securities Exchange trades <strong>Monday – Friday, 9:00 AM – 3:00 PM EAT</strong>.
+                            Stock prices shown are the most recent closing prices — some counters may not display if they had no activity on the last trading day.
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-2 text-xs text-blue-400/60">
+                            <Clock size={11} />
+                            <span>Prices will update live when the market reopens on the next trading day.</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -414,19 +432,19 @@ export default function InvestmentPage() {
                                     </div>
                                 </div>
 
-                                {/* Stake input */}
+                                {/* Amount input */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-muted-foreground">
-                                        Stake Amount <span className="text-xs opacity-60">(Min KSh 10)</span>
+                                        Allocation Amount <span className="text-xs opacity-60">(Min KSh 10)</span>
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-mono">KSh</span>
                                         <input
-                                            id="stake-input"
+                                            id="allocation-input"
                                             type="number"
                                             min={10}
-                                            value={stake}
-                                            onChange={(e) => setStake(e.target.value)}
+                                            value={amount}
+                                            onChange={(e) => setAmount(e.target.value)}
                                             className="w-full bg-black/40 border border-white/10 rounded-lg pl-12 pr-4 py-3 font-bold font-mono text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
                                         />
                                     </div>
@@ -439,7 +457,7 @@ export default function InvestmentPage() {
                                 <button
                                     id="place-prediction-btn"
                                     onClick={handlePlacePrediction}
-                                    disabled={!prediction || Number(stake) < 10 || isPlacing}
+                                    disabled={!prediction || Number(amount) < 10 || isPlacing}
                                     className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                                 >
                                     {isPlacing ? 'PLACING...' : 'PLACE PREDICTION →'}

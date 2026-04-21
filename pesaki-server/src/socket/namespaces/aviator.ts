@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { logger } from '../../utils/logger';
-import { cashOut, getAviatorState } from '../../games/aviator/engine';
+import { realizeGain, getAviatorState } from '../../games/aviator/engine';
 
 export const setupAviatorNamespace = (io: Server) => {
   const nsp = io.of('/aviator');
@@ -22,7 +22,7 @@ export const setupAviatorNamespace = (io: Server) => {
     socket.on('CASHOUT', async () => {
       try {
         const userId = socket.data.user.id;
-        const result = await cashOut(userId);
+        const result = await realizeGain(userId);
         socket.emit('CASHED_OUT', result);
       } catch (error: any) {
         socket.emit('CASHOUT_FAILED', { error: error.message });
