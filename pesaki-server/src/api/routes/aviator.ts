@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { placeBet } from '../../games/aviator/engine';
+import { placeOrder } from '../../games/aviator/engine';
 import { verifyAuth } from '../../middleware/auth';
 
 const betSchema = z.object({
@@ -16,7 +16,7 @@ export const aviatorRoutes = async (fastify: FastifyInstance) => {
     }
     
     try {
-      const result = await placeBet(request.user!.id, parsed.data.amount, parsed.data.mode);
+      const result = await placeOrder(request.user!.id, parsed.data.amount, parsed.data.mode);
       return reply.send({ success: true, data: result });
     } catch (err: any) {
       return reply.code(400).send({ success: false, error: err.message, code: 'AVIATOR_ERROR' });
