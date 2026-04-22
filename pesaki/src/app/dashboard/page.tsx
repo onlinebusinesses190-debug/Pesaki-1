@@ -33,7 +33,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Pr
                         </h1>
                         <p className="text-zinc-400">
                             {isDemo ? (
-                                <>You're currently playing in <span className="font-bold text-blue-400">DEMO</span> mode.</>
+                                <>You're currently trading in <span className="font-bold text-blue-400">DEMO</span> mode.</>
                             ) : (
                                 <>Access real-time markets and place your trades.</>
                             )}
@@ -134,7 +134,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Pr
                             <Wallet size={24} />
                         </div>
                         <div>
-                            <div className="text-sm font-bold text-white">Ready to play with real money?</div>
+                            <div className="text-sm font-bold text-white">Ready to trade with real money?</div>
                             <div className="text-xs text-zinc-400">Deposit instantly via M-Pesa. Minimum KSh 10.</div>
                         </div>
                     </div>

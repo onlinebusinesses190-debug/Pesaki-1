@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-    User, Shield, Bell, HelpCircle, Lock, Smartphone, ChevronRight, Save, Info, 
+import {
+    User, Shield, Bell, HelpCircle, Lock, Smartphone, ChevronRight, Save, Info,
     AlertTriangle, Mail, MessageSquare, Headphones, LogOut, CheckCircle2, ChevronDown, FileText
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
@@ -14,7 +14,7 @@ const TABS = [
     { id: 'profile', label: 'Profile', icon: User, desc: 'Personal details' },
     { id: 'security', label: 'Security', icon: Shield, desc: 'Password & login' },
     { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'Alerts & emails' },
-    { id: 'gaming', label: 'Responsible Gaming', icon: Info, desc: 'Limits & exclusion' },
+    { id: 'gaming', label: 'Responsible Marketting', icon: Info, desc: 'Limits & exclusion' },
     { id: 'help', label: 'Help & Support', icon: HelpCircle, desc: 'FAQs & contact' },
 ]
 
@@ -24,7 +24,7 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('profile')
     const [user, setUser] = useState<any>(null)
     const [profile, setProfile] = useState<any>(null)
-    
+
     // Profile State
     const [fullName, setFullName] = useState('')
     const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -50,7 +50,7 @@ export default function SettingsPage() {
                     .select('*')
                     .eq('id', user.id)
                     .single()
-                
+
                 if (profileData) {
                     setProfile(profileData)
                     setFullName(profileData.full_name || '')
@@ -63,12 +63,12 @@ export default function SettingsPage() {
     const handleSaveProfile = async () => {
         setIsSavingProfile(true)
         const supabase = createClient()
-        
+
         const { error } = await supabase
             .from('profiles')
             .update({ full_name: fullName })
             .eq('id', user.id)
-        
+
         if (error) {
             toast.error('Failed to update profile')
         } else {
@@ -91,7 +91,7 @@ export default function SettingsPage() {
         setIsUpdatingPassword(true)
         const supabase = createClient()
         const { error } = await supabase.auth.updateUser({ password: newPassword })
-        
+
         if (error) {
             toast.error('Failed to update password. Make sure you are logged in.')
         } else {
@@ -286,14 +286,14 @@ export default function SettingsPage() {
                                                         <div className="text-xs text-zinc-500 mt-0.5">{item.desc}</div>
                                                     </div>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         item.setter(!item.state)
                                                         toast.success(`${item.title} ${!item.state ? 'enabled' : 'disabled'}`)
                                                     }}
                                                     className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${item.state ? 'bg-primary' : 'bg-zinc-700'}`}
                                                 >
-                                                    <motion.div 
+                                                    <motion.div
                                                         layout
                                                         className={`w-4 h-4 rounded-full bg-white absolute top-1 ${item.state ? 'right-1' : 'left-1'}`}
                                                     />
@@ -312,8 +312,8 @@ export default function SettingsPage() {
                                             <AlertTriangle size={20} />
                                         </div>
                                         <div>
-                                            <h2 className="text-xl font-bold text-white">Responsible Gaming</h2>
-                                            <p className="text-xs text-zinc-400 font-medium mt-0.5">Tools to help you play safely</p>
+                                            <h2 className="text-xl font-bold text-white">Responsible </h2>
+                                            <p className="text-xs text-zinc-400 font-medium mt-0.5">Tools to help you trade safely</p>
                                         </div>
                                     </div>
                                     <div className="p-6 sm:p-8 space-y-6">
@@ -323,10 +323,10 @@ export default function SettingsPage() {
                                                 <h3 className="text-base font-bold text-red-500">Self-Exclusion</h3>
                                             </div>
                                             <p className="text-sm text-red-200/60 leading-relaxed font-medium">
-                                                Need a break? You can temporarily or permanently lock your account from betting. During a self-exclusion period, you will not be able to log in, deposit, or place bets.
+                                                Need a break? You can temporarily or permanently lock your account from trading. During a self-exclusion period, you will not be able to log in, deposit, or place trades.
                                             </p>
                                             <div className="pt-4 flex gap-4">
-                                                <button 
+                                                <button
                                                     onClick={() => toast.error('This requires identity verification. Please contact support.')}
                                                     className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 shadow-none border border-red-500/20 text-red-500 font-bold rounded-2xl transition-colors text-sm"
                                                 >

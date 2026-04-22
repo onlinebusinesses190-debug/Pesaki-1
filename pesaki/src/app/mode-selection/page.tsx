@@ -21,7 +21,7 @@ export default function ModeSelection() {
             <div className="w-full max-w-4xl z-10">
                 <div className="text-center mb-12 space-y-4">
                     <h1 className="text-5xl font-bold tracking-tight text-white">Choose Your Mode</h1>
-                    <p className="text-xl text-muted-foreground">Select how you want to play today</p>
+                    <p className="text-xl text-muted-foreground">Select how you want to trade today</p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-8">
@@ -57,7 +57,7 @@ export default function ModeSelection() {
                         </div>
                     </div>
 
-                    {/* Real Play Mode Card */}
+                    {/* Real Market Mode Card */}
                     <div
                         onClick={() => selectMode('real')}
                         className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-card/40 backdrop-blur-xl p-8 transition-all duration-300 hover:scale-[1.02] hover:bg-card/60 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/20"
@@ -70,7 +70,7 @@ export default function ModeSelection() {
                             </div>
 
                             <div className="space-y-2">
-                                <h2 className="text-3xl font-bold text-white">Real Play</h2>
+                                <h2 className="text-3xl font-bold text-white">Real Market</h2>
                                 <div className="inline-flex items-center rounded-full bg-primary/20 px-3 py-1 text-xs font-medium text-primary border border-primary/20">
                                     Win Real Cash
                                 </div>

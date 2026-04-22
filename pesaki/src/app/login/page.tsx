@@ -30,7 +30,7 @@ export default function LoginPage() {
         // Remove spaces and non-digit characters if we were to enforce it strictly.
         // For now, strip whitespaces.
         const input = identifier.replace(/\s+/g, '')
-        
+
         // Basic frontend validation for phone numbers
         if (!/^[+]?[0-9]{9,15}$/.test(input)) {
             setError("Please enter a valid mobile number")
@@ -93,7 +93,7 @@ export default function LoginPage() {
                 <div className="text-center space-y-2">
                     <h1 className="text-4xl font-bold tracking-tight text-white mb-2">PESAKI</h1>
                     <p className="text-muted-foreground">
-                        {isSignUp ? 'Join the platform' : 'Login to start playing'}
+                        {isSignUp ? 'Join the platform' : 'Login to start marketing'}
                     </p>
                 </div>
 
@@ -157,7 +157,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10 text-[10px] text-muted-foreground text-center">
-                        All accounts are secured exclusively via Mobile Number.
+                    All accounts are secured exclusively via Mobile Number.
                 </div>
             </div>
         </div>

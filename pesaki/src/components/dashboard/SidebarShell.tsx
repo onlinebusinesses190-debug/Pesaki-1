@@ -101,7 +101,7 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
                             </div>
                             <div className={`text-lg font-bold flex items-center gap-2 ${mode === 'real' ? 'text-primary' : 'text-accent'
                                 }`}>
-                                {mode === 'real' ? 'Real Play' : 'Demo Mode'}
+                                {mode === 'real' ? 'Real Market' : 'Demo Mode'}
                                 <div className={`w-2 h-2 rounded-full animate-pulse ${mode === 'real' ? 'bg-primary' : 'bg-accent'
                                     }`} />
                             </div>
@@ -277,7 +277,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
                             </div>
                             <div className={`text-lg font-bold flex items-center gap-2 ${mode === 'real' ? 'text-primary' : 'text-accent'
                                 }`}>
-                                {mode === 'real' ? 'Real Play' : 'Demo Mode'}
+                                {mode === 'real' ? 'Real Market' : 'Demo Mode'}
                                 <div className={`w-2 h-2 rounded-full animate-pulse ${mode === 'real' ? 'bg-primary' : 'bg-accent'
                                     }`} />
                             </div>

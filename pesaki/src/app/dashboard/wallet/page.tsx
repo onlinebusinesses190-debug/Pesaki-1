@@ -125,7 +125,7 @@ export default function WalletPage() {
                         <Wallet size={32} className="text-accent" />
                     </div>
                     <h1 className="text-3xl font-bold text-white">Demo Wallet</h1>
-                    <p className="text-zinc-400">You are in Demo Mode. Switch to Real Play to deposit and withdraw real money.</p>
+                    <p className="text-zinc-400">You are in Demo Mode. Switch to Real Market to deposit and withdraw real money.</p>
                 </div>
                 <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
                     <div className="text-6xl font-black text-white">KSh 10,000</div>
@@ -134,7 +134,7 @@ export default function WalletPage() {
                         href="/mode-selection"
                         className="block w-full py-3 mt-4 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-all"
                     >
-                        Switch to Real Play
+                        Switch to Real Market
                     </a>
                 </div>
             </div>
