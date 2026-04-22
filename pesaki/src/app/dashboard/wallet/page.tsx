@@ -58,7 +58,7 @@ export default function WalletPage() {
 
         try {
             // Only send amount — backend auto-uses the registered phone
-            const res = await fetch('/api/mpesa/stkpush', {
+            const res = await fetch('/api/p/deposit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ amount: Number(amount) }),
@@ -95,7 +95,7 @@ export default function WalletPage() {
         setMessage('')
 
         try {
-            const res = await fetch('/api/mpesa/withdraw', {
+            const res = await fetch('/api/p/withdraw', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ amount: Number(amount) }),

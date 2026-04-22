@@ -4,7 +4,7 @@ import { credit } from '../../wallet/service';
 import { supabase } from '../../lib/supabase';
 
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
-  fastify.post('/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/k', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
     
     try {
@@ -67,5 +67,49 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
 
     return reply.code(200).send({ success: true });
+  });
+
+  // Validation URL
+  fastify.post('/v', async (request: FastifyRequest, reply: FastifyReply) => {
+    logger.info({ body: request.body }, 'M-Pesa Validation received');
+    return reply.code(200).send({
+      ResultCode: 0,
+      ResultDesc: 'Accepted'
+    });
+  });
+
+  // Confirmation URL
+  fastify.post('/c', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body: any = request.body;
+    logger.info({ body }, 'M-Pesa Confirmation received');
+
+    try {
+      const amount = Number(body.TransAmount);
+      const mpesaReceipt = body.TransID;
+      const phoneNumber = body.MSISDN; // Format: 2547XXXXXXXX
+
+      // Find user by phone number in profiles
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', phoneNumber)
+        .single();
+
+      if (profileError || !profile) {
+        // Try normalized phone if direct match fails (e.g. if stored as 07...)
+        // But MSISDN is usually 254...
+        logger.error({ phoneNumber, mpesaReceipt }, 'C2B received for unknown phone number');
+        return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
+      }
+
+      // Credit the wallet
+      await credit(profile.id, amount, 'real', `M-Pesa C2B Deposit: ${mpesaReceipt}`);
+      logger.info({ mpesaReceipt, amount, userId: profile.id }, 'Processed accepted M-PESA C2B deposit');
+
+    } catch (error) {
+      logger.error(error, 'Error processing M-Pesa C2B confirmation');
+    }
+
+    return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
   });
 };

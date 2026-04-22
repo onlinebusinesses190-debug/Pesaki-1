@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createClient as createServerClient } from '@/utils/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 const BASE_URL = process.env.DARAJA_ENV === 'production'
     ? 'https://api.safaricom.co.ke'
@@ -35,7 +36,7 @@ async function getDarajaToken(): Promise<string> {
 
 export async function POST(request: Request) {
     try {
-        const supabase = await createClient()
+        const supabase = await createServerClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         
         if (authError || !user) {
@@ -125,8 +126,13 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        // Record the pending deposit linked to this user
-        const { error: insertError } = await supabase.from('mpesa_deposits').insert({
+        // Record the pending deposit linked to this user (using Admin client to bypass RLS)
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+
+        const { error: insertError } = await supabaseAdmin.from('mpesa_deposits').insert({
             checkout_request_id: data.CheckoutRequestID,
             user_id: user.id,
             amount: Number(amount),
