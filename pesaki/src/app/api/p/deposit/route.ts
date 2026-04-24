@@ -80,8 +80,9 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        const storeNumber = '5710970' // Your Store Number
-        const tillNumber = '3240141'  // Your Till Number
+        const parentShortCode = '4574053' // The primary shortcode linked to your Daraja App
+        const storeNumber = '5710970'     // Your Store Number for Buy Goods
+        const tillNumber = '3240141'      // Your Till Number (just for reference)
         const passkey = (process.env.DARAJA_PASSKEY || '').trim()
         const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
 
@@ -97,30 +98,30 @@ export async function POST(request: Request) {
             + String(eatDate.getMinutes()).padStart(2, '0')
             + String(eatDate.getSeconds()).padStart(2, '0')
 
-        // Password must be generated using the Store Number for Buy Goods
-        const password = Buffer.from(`${storeNumber}${passkey}${timestamp}`).toString('base64')
+        // Password must match the BusinessShortCode used below
+        const password = Buffer.from(`${parentShortCode}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
         const transactionType = 'CustomerBuyGoodsOnline'
-        const accountRef = `DEPOSIT${user.id.slice(0, 4).toUpperCase()}`
+        const accountRef = `PAY${user.id.slice(0, 5).toUpperCase()}`
 
         const payload = {
-            BusinessShortCode: storeNumber,
+            BusinessShortCode: parentShortCode,
             Password: password,
             Timestamp: timestamp,
             TransactionType: transactionType,
             Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
-            PartyB: tillNumber, // For some Tills, PartyB is the Till Number
+            PartyB: storeNumber, // For Buy Goods STK, PartyB is usually the Store Number
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
-            TransactionDesc: 'WalletDeposit',
+            TransactionDesc: 'Deposit',
         }
 
-        console.info('[STK Push Initiating Buy Goods]', { 
-            storeNumber, 
-            tillNumber,
+        console.info('[STK Push Initiating - Parent/Store Combo]', { 
+            parentShortCode, 
+            storeNumber,
             phone: normalizedPhone, 
             amount: payload.Amount 
         })
