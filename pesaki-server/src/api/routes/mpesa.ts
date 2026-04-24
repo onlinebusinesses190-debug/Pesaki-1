@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/k', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
-    logger.debug({ body }, 'M-Pesa STK webhook received');
+    logger.info({ body }, 'M-Pesa STK webhook received');
     
     try {
       const stkCallback = body?.Body?.stkCallback;
@@ -31,9 +31,9 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
             .single();
 
           if (depositRecordError || !depositRecord) {
-            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, stkCallback }, 'M-Pesa STK callback failed/cancelled and no matching deposit found');
+            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, stkCallback }, `M-Pesa STK callback failed/cancelled: ${resultDesc} (Code: ${resultCode}) - No matching deposit found`);
           } else {
-            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, deposit: depositRecord }, 'M-Pesa STK callback failed or cancelled for pending deposit');
+            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, deposit: depositRecord }, `M-Pesa STK callback failed/cancelled for pending deposit: ${resultDesc} (Code: ${resultCode})`);
           }
 
           await supabase.from('mpesa_deposits').update({ status: 'failed' }).eq('checkout_request_id', checkoutRequestId);
