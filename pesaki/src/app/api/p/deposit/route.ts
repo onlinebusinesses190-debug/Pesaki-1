@@ -81,8 +81,8 @@ export async function POST(request: Request) {
         }
 
         const parentShortCode = '4574053' // The primary shortcode linked to your Daraja App
-        const storeNumber = '5710970'     // Your Store Number for Buy Goods
-        const tillNumber = '3240141'      // Your Till Number (just for reference)
+        const storeNumber = '5710970'     // Your Store Number
+        const tillNumber = '3240141'      // Your Till Number
         const passkey = (process.env.DARAJA_PASSKEY || '').trim()
         const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
 
@@ -112,16 +112,16 @@ export async function POST(request: Request) {
             TransactionType: transactionType,
             Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
-            PartyB: storeNumber, // For Buy Goods STK, PartyB is usually the Store Number
+            PartyB: tillNumber, // Trying the Till Number as PartyB
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
             TransactionDesc: 'Deposit',
         }
 
-        console.info('[STK Push Initiating - Parent/Store Combo]', { 
+        console.info('[STK Push Initiating - Parent/Till Combo]', { 
             parentShortCode, 
-            storeNumber,
+            tillNumber,
             phone: normalizedPhone, 
             amount: payload.Amount 
         })
