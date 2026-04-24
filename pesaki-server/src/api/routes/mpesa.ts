@@ -95,6 +95,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     });
   });
 
+  
   // Confirmation URL
   fastify.post('/c', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
