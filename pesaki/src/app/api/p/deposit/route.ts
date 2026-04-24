@@ -80,7 +80,8 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        const shortcode = (process.env.DARAJA_SHORTCODE || '').trim()
+        const storeNumber = '5710970' // Your Store Number
+        const tillNumber = '3240141'  // Your Till Number
         const passkey = (process.env.DARAJA_PASSKEY || '').trim()
         const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
 
@@ -96,30 +97,30 @@ export async function POST(request: Request) {
             + String(eatDate.getMinutes()).padStart(2, '0')
             + String(eatDate.getSeconds()).padStart(2, '0')
 
-        const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
+        // Password must be generated using the Store Number for Buy Goods
+        const password = Buffer.from(`${storeNumber}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
-        // Switched to 'CustomerBuyGoodsOnline' as manual phone test confirmed it's a Till
-        const transactionType = 'CustomerBuyGoodsOnline' 
-        const accountRef = `BUY${user.id.slice(0, 5).toUpperCase()}`
+        const transactionType = 'CustomerBuyGoodsOnline'
+        const accountRef = `DEPOSIT${user.id.slice(0, 4).toUpperCase()}`
 
         const payload = {
-            BusinessShortCode: shortcode,
+            BusinessShortCode: storeNumber,
             Password: password,
             Timestamp: timestamp,
             TransactionType: transactionType,
             Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
-            PartyB: shortcode,
+            PartyB: tillNumber, // For some Tills, PartyB is the Till Number
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
-            TransactionDesc: 'Deposit',
+            TransactionDesc: 'WalletDeposit',
         }
 
-        console.info('[STK Push Initiating]', { 
-            type: transactionType, 
-            shortcode, 
+        console.info('[STK Push Initiating Buy Goods]', { 
+            storeNumber, 
+            tillNumber,
             phone: normalizedPhone, 
             amount: payload.Amount 
         })
