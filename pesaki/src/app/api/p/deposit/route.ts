@@ -77,9 +77,9 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        const shortcode = process.env.DARAJA_SHORTCODE!
-        const passkey = process.env.DARAJA_PASSKEY!
-        const callbackUrl = process.env.DARAJA_CALLBACK_URL!
+        const shortcode = (process.env.DARAJA_SHORTCODE || '').trim()
+        const passkey = (process.env.DARAJA_PASSKEY || '').trim()
+        const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
 
         // Generate timestamp in EAT (UTC+3) as required by Safaricom
         const now = new Date()
@@ -96,21 +96,21 @@ export async function POST(request: Request) {
         const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
-        // Create a more unique AccountReference to avoid 'unresolved' system failures
-        const accountRef = `PESAKI-${user.id.slice(0, 5).toUpperCase()}`
+        // Simplify AccountReference to be strictly alphanumeric (some systems reject hyphens)
+        const accountRef = `DEPOSIT${user.id.slice(0, 4).toUpperCase()}`
 
         const payload = {
             BusinessShortCode: shortcode,
             Password: password,
             Timestamp: timestamp,
             TransactionType: 'CustomerPayBillOnline',
-            Amount: Math.floor(Number(amount)), // Ensure integer
+            Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
             PartyB: shortcode,
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
-            TransactionDesc: 'Wallet Deposit',
+            TransactionDesc: 'WalletDeposit',
         }
 
         const res = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
