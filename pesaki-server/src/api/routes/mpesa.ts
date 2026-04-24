@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/k', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
+    logger.debug({ body }, 'M-Pesa STK webhook received');
     
     try {
       const stkCallback = body?.Body?.stkCallback;
@@ -20,9 +21,26 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         return reply.code(200).send({ success: true });
       }
 
+      // Failed or cancelled callbacks have non-zero result codes. Log full context to aid debugging.
       if (resultCode !== 0) {
-        logger.info({ reason: resultDesc, checkoutRequestId }, 'M-Pesa payment failed or cancelled');
-        await supabase.from('mpesa_deposits').update({ status: 'failed' }).eq('checkout_request_id', checkoutRequestId);
+        try {
+          const { data: depositRecord, error: depositRecordError } = await supabase
+            .from('mpesa_deposits')
+            .select('user_id, phone, amount, status')
+            .eq('checkout_request_id', checkoutRequestId)
+            .single();
+
+          if (depositRecordError || !depositRecord) {
+            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, stkCallback }, 'M-Pesa STK callback failed/cancelled and no matching deposit found');
+          } else {
+            logger.info({ resultCode, reason: resultDesc, checkoutRequestId, deposit: depositRecord }, 'M-Pesa STK callback failed or cancelled for pending deposit');
+          }
+
+          await supabase.from('mpesa_deposits').update({ status: 'failed' }).eq('checkout_request_id', checkoutRequestId);
+        } catch (err) {
+          logger.error({ err, checkoutRequestId, resultCode, stkCallback }, 'Error while handling failed M-Pesa STK callback');
+        }
+
         return reply.code(200).send({ success: true }); // Always 200 for Safaricom
       }
 
@@ -34,7 +52,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         callbackMetadata.Item.forEach((item: any) => {
           if (item.Name === 'Amount') amount = item.Value;
           if (item.Name === 'MpesaReceiptNumber') mpesaReceipt = item.Value;
-// Phone number handled by M-Pesa natively, not needed for inner logic
         });
       }
 

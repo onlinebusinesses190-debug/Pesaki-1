@@ -118,6 +118,9 @@ export async function POST(request: Request) {
 
         const data = await res.json()
 
+        // Log the Daraja response for diagnostics
+        console.info('[STK Push Response]', { responseStatus: res.status, body: data, phone: normalizedPhone, amount: Number(amount) })
+
         if (!res.ok || data.ResponseCode !== '0') {
             console.error('[STK Push Error]', data)
             return NextResponse.json({
@@ -144,6 +147,9 @@ export async function POST(request: Request) {
             console.error('[STK Push DB Insert Error]', insertError)
             return NextResponse.json({ error: 'Failed to record transaction' }, { status: 500 })
         }
+
+        // Log the recorded pending deposit for easier tracing
+        console.info('[STK Push Recorded]', { CheckoutRequestID: data.CheckoutRequestID, phone: normalizedPhone, amount: Number(amount) })
 
         return NextResponse.json({
             success: true,
