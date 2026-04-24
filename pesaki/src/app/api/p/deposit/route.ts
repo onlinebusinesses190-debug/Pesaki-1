@@ -81,30 +81,36 @@ export async function POST(request: Request) {
         const passkey = process.env.DARAJA_PASSKEY!
         const callbackUrl = process.env.DARAJA_CALLBACK_URL!
 
-        // Generate timestamp: YYYYMMDDHHmmss
+        // Generate timestamp in EAT (UTC+3) as required by Safaricom
         const now = new Date()
-        const timestamp = now.getFullYear().toString()
-            + String(now.getMonth() + 1).padStart(2, '0')
-            + String(now.getDate()).padStart(2, '0')
-            + String(now.getHours()).padStart(2, '0')
-            + String(now.getMinutes()).padStart(2, '0')
-            + String(now.getSeconds()).padStart(2, '0')
+        const eatOffset = 3 * 60 * 60 * 1000 // 3 hours in ms
+        const eatDate = new Date(now.getTime() + eatOffset)
+        
+        const timestamp = eatDate.getFullYear().toString()
+            + String(eatDate.getMonth() + 1).padStart(2, '0')
+            + String(eatDate.getDate()).padStart(2, '0')
+            + String(eatDate.getHours()).padStart(2, '0')
+            + String(eatDate.getMinutes()).padStart(2, '0')
+            + String(eatDate.getSeconds()).padStart(2, '0')
 
         const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
+
+        // Create a more unique AccountReference to avoid 'unresolved' system failures
+        const accountRef = `PESAKI-${user.id.slice(0, 5).toUpperCase()}`
 
         const payload = {
             BusinessShortCode: shortcode,
             Password: password,
             Timestamp: timestamp,
             TransactionType: 'CustomerPayBillOnline',
-            Amount: Math.ceil(Number(amount)),
+            Amount: Math.floor(Number(amount)), // Ensure integer
             PartyA: normalizedPhone,
             PartyB: shortcode,
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
-            AccountReference: 'Pesaki',
-            TransactionDesc: 'Pesaki Wallet Deposit',
+            AccountReference: accountRef,
+            TransactionDesc: 'Wallet Deposit',
         }
 
         const res = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
