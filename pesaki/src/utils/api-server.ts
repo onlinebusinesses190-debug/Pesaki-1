@@ -1,6 +1,6 @@
 import { createClient } from './supabase/server';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://pesaki-server.onrender.com';
 
 export async function apiServerRequest(path: string, options: RequestInit = {}) {
     const supabase = await createClient();

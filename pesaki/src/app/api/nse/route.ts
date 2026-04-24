@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * Returns: { stocks: NseStock[], updatedAt: string, marketOpen: boolean }
  */
 export async function GET() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pesaki-server.onrender.com'
 
     try {
         const res = await fetch(`${apiUrl}/games/nse/stocks`, {

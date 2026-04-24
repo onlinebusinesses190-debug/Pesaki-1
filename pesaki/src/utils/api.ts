@@ -1,13 +1,12 @@
 import { createClient as createBrowserClient } from './supabase/client';
 
 const getApiUrl = () => {
-    if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
+    if (process.env.NEXT_PUBLIC_API_URL) {
         return process.env.NEXT_PUBLIC_API_URL;
     }
-    if (typeof window !== 'undefined' && window.location.hostname) {
-        return `http://${window.location.hostname}:4000`;
-    }
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    
+    // Fallback for development or if env is missing
+    return 'https://pesaki-server.onrender.com';
 };
 const API_URL = getApiUrl();
 
