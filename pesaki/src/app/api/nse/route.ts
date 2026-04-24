@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
+
 /**
  * GET /api/nse
  * Proxies NSE stock data from the backend server (pesaki-server).
