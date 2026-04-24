@@ -64,16 +64,19 @@ export async function POST(request: Request) {
         }
 
         // Normalize phone number to 254XXXXXXXXX format (handles 07XX, +254, 254 prefixes)
-        let normalizedPhone = String(profile.phone).replace(/\s+/g, '').replace(/[^0-9+]/g, '')
+        // Normalize phone number to 254XXXXXXXXX format and remove any lingering non-numeric chars
+        let normalizedPhone = String(profile.phone).replace(/\s+/g, '').replace(/[^0-9]/g, '')
         if (normalizedPhone.startsWith('0')) {
             normalizedPhone = '254' + normalizedPhone.slice(1)
         } else if (normalizedPhone.startsWith('+')) {
             normalizedPhone = normalizedPhone.slice(1)
+        } else if (normalizedPhone.startsWith('7') || normalizedPhone.startsWith('1')) {
+            normalizedPhone = '254' + normalizedPhone
         }
 
-        if (!normalizedPhone.startsWith('254') || normalizedPhone.length !== 12) {
+        if (normalizedPhone.length !== 12 || !normalizedPhone.startsWith('254')) {
             return NextResponse.json({ 
-                error: `Invalid phone number format on your account: ${profile.phone}` 
+                error: `Invalid phone number format: ${profile.phone}. Expected 2547XXXXXXXX or 2541XXXXXXXX.` 
             }, { status: 400 })
         }
 
@@ -81,9 +84,9 @@ export async function POST(request: Request) {
         const passkey = (process.env.DARAJA_PASSKEY || '').trim()
         const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
 
-        // Generate timestamp in EAT (UTC+3) as required by Safaricom
+        // Generate timestamp in EAT (UTC+3)
         const now = new Date()
-        const eatOffset = 3 * 60 * 60 * 1000 // 3 hours in ms
+        const eatOffset = 3 * 60 * 60 * 1000
         const eatDate = new Date(now.getTime() + eatOffset)
         
         const timestamp = eatDate.getFullYear().toString()
@@ -96,22 +99,30 @@ export async function POST(request: Request) {
         const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
-        // Simplify AccountReference to be strictly alphanumeric (some systems reject hyphens)
-        const accountRef = `DEPOSIT${user.id.slice(0, 4).toUpperCase()}`
+        // Toggle this to 'CustomerBuyGoodsOnline' if manual phone test shows it's a Till
+        const transactionType = 'CustomerPayBillOnline' 
+        const accountRef = `PAY${user.id.slice(0, 5).toUpperCase()}`
 
         const payload = {
             BusinessShortCode: shortcode,
             Password: password,
             Timestamp: timestamp,
-            TransactionType: 'CustomerPayBillOnline',
+            TransactionType: transactionType,
             Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
             PartyB: shortcode,
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
-            TransactionDesc: 'WalletDeposit',
+            TransactionDesc: 'Deposit',
         }
+
+        console.info('[STK Push Initiating]', { 
+            type: transactionType, 
+            shortcode, 
+            phone: normalizedPhone, 
+            amount: payload.Amount 
+        })
 
         const res = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
             method: 'POST',
