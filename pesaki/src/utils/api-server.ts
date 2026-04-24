@@ -5,7 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://pesaki-server.onrend
 export async function apiServerRequest(path: string, options: RequestInit = {}) {
     const supabase = await createClient();
     let { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     // Fallback: try to refresh session if not found
     if (!session) {
         console.warn('Session not immediately found, attempting refresh...');
@@ -18,9 +18,10 @@ export async function apiServerRequest(path: string, options: RequestInit = {}) 
         }
     }
 
+
     const headers = new Headers(options.headers);
     const token = session?.access_token;
-    
+
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
         console.info('API Server Request - Token attached');
@@ -43,7 +44,7 @@ export async function apiServerRequest(path: string, options: RequestInit = {}) 
         try {
             const error = await response.json();
             errorMsg = error.error || error.message || errorMsg;
-        } catch (e) {}
+        } catch (e) { }
         throw new Error(errorMsg);
     }
 
