@@ -99,9 +99,9 @@ export async function POST(request: Request) {
         const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
-        // Toggle this to 'CustomerBuyGoodsOnline' if manual phone test shows it's a Till
-        const transactionType = 'CustomerPayBillOnline' 
-        const accountRef = `PAY${user.id.slice(0, 5).toUpperCase()}`
+        // Switched to 'CustomerBuyGoodsOnline' as manual phone test confirmed it's a Till
+        const transactionType = 'CustomerBuyGoodsOnline' 
+        const accountRef = `BUY${user.id.slice(0, 5).toUpperCase()}`
 
         const payload = {
             BusinessShortCode: shortcode,
