@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -80,9 +81,10 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
             >
                 <div className="h-full flex flex-col">
                     <div className="h-16 flex items-center px-6 border-b border-white/5">
-                        <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                            PESAKI
-                        </span>
+                        <Link href="/" className="flex items-center gap-2">
+                            <Image src="/logo.png" alt="Pesaki Logo" width={36} height={36} className="h-8 w-auto" />
+                            <span className="font-extrabold text-lg tracking-wide text-white uppercase">Pesaki</span>
+                        </Link>
                         <button
                             onClick={toggleSidebar}
                             className="ml-auto lg:hidden text-muted-foreground hover:text-white"
@@ -256,9 +258,10 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
             >
                 <div className="h-full flex flex-col">
                     <div className="h-16 flex items-center px-6 border-b border-white/5">
-                        <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                            PESAKI
-                        </span>
+                        <Link href="/" className="flex items-center gap-2">
+                            <Image src="/logo.png" alt="Pesaki Logo" width={36} height={36} className="h-8 w-auto" />
+                            <span className="font-extrabold text-lg tracking-wide text-white uppercase">Pesaki</span>
+                        </Link>
                         <button
                             onClick={toggleSidebar}
                             className="ml-auto lg:hidden text-muted-foreground hover:text-white"

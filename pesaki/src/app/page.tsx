@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Trophy, Zap, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
@@ -23,10 +24,9 @@ export default async function Home() {
       {/* Navigation */}
       <nav className="relative z-10 border-b border-white/5 bg-black/50 backdrop-blur-md">
         <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="text-2xl font-black tracking-tighter flex items-center gap-2">
-            <span className="bg-primary px-2 py-0.5 rounded text-white">P</span>
-            PESAKI
-          </div>
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Pesaki Logo" width={140} height={40} className="h-10 w-auto" priority />
+          </Link>
           <div className="flex items-center gap-6">
             <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors">
               Login

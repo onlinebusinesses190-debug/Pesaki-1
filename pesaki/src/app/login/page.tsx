@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient as createBrowserClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import Link from 'next/link'
 
 export default function LoginPage() {
     const [identifier, setIdentifier] = useState('') // Phone number
@@ -90,9 +92,11 @@ export default function LoginPage() {
 
             <div className="w-full max-w-md space-y-8 bg-card/50 backdrop-blur-xl p-8 rounded-2xl border border-white/10 shadow-2xl relative z-10">
 
-                <div className="text-center space-y-2">
-                    <h1 className="text-4xl font-bold tracking-tight text-white mb-2">PESAKI</h1>
-                    <p className="text-muted-foreground">
+                <div className="text-center space-y-4 flex flex-col items-center">
+                    <Link href="/">
+                        <Image src="/logo.png" alt="Pesaki Logo" width={180} height={60} className="h-14 w-auto" priority />
+                    </Link>
+                    <p className="text-muted-foreground pt-2">
                         {isSignUp ? 'Join the platform' : 'Login to start marketing'}
                     </p>
                 </div>

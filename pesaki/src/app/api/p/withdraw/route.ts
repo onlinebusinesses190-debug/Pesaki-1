@@ -9,6 +9,11 @@ const BASE_URL = process.env.DARAJA_ENV === 'production'
 async function getDarajaToken(): Promise<string> {
     const consumerKey = (process.env.DARAJA_CONSUMER_KEY || '').trim()
     const consumerSecret = (process.env.DARAJA_CONSUMER_SECRET || '').trim()
+
+    if (!consumerKey || !consumerSecret) {
+        throw new Error('Missing Daraja consumer key/secret in environment')
+    }
+
     const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64')
 
     const res = await fetch(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
@@ -17,8 +22,12 @@ async function getDarajaToken(): Promise<string> {
         cache: 'no-store',
     })
     
-    if (!res.ok) throw new Error('Failed to fetch Daraja token')
+    if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(`Failed to fetch Daraja token: ${res.status} ${txt}`)
+    }
     const data = await res.json()
+    if (!data?.access_token) throw new Error(`Daraja token response missing access_token: ${JSON.stringify(data)}`)
     return data.access_token
 }
 
@@ -71,10 +80,32 @@ export async function POST(request: Request) {
         // 3. Initiate Daraja B2C Request
         const accessToken = await getDarajaToken()
         const b2cShortcode = process.env.DARAJA_B2C_SHORTCODE || process.env.DARAJA_SHORTCODE;
-        
+
+        if (!b2cShortcode) {
+            // Refund and fail early if critical config missing
+            await supabase.rpc('credit_wallet', {
+                p_user_id: user.id,
+                p_amount: withdrawalAmount,
+                p_mode: 'real',
+                p_description: 'Refund: Withdrawal Request Failed (missing B2C shortcode)'
+            })
+            return NextResponse.json({ error: 'B2C shortcode not configured' }, { status: 500 })
+        }
+
+        const securityCredential = process.env.DARAJA_B2C_SECURITY_CREDENTIAL
+        if (!securityCredential) {
+            await supabase.rpc('credit_wallet', {
+                p_user_id: user.id,
+                p_amount: withdrawalAmount,
+                p_mode: 'real',
+                p_description: 'Refund: Withdrawal Request Failed (missing security credential)'
+            })
+            return NextResponse.json({ error: 'B2C security credential not configured' }, { status: 500 })
+        }
+
         const b2cPayload = {
             InitiatorName: process.env.DARAJA_B2C_INITIATOR_NAME || 'testapi',
-            SecurityCredential: process.env.DARAJA_B2C_SECURITY_CREDENTIAL,
+            SecurityCredential: securityCredential,
             CommandID: 'BusinessPayment',
             Amount: Math.floor(withdrawalAmount),
             PartyA: b2cShortcode,
@@ -85,6 +116,7 @@ export async function POST(request: Request) {
             Occasion: 'Wallet Withdrawal'
         }
 
+        console.info('[B2C Request]', { phone, amount: withdrawalAmount, partyA: b2cShortcode })
         const mpesaRes = await fetch(`${BASE_URL}/mpesa/b2c/v1/paymentrequest`, {
             method: 'POST',
             headers: {
@@ -95,6 +127,7 @@ export async function POST(request: Request) {
         })
 
         const mpesaData = await mpesaRes.json()
+        console.info('[B2C Response]', { status: mpesaRes.status, body: mpesaData })
 
         if (!mpesaRes.ok || mpesaData.ResponseCode !== '0') {
             // CRITICAL: If B2C request fails immediately, refund the user
@@ -104,9 +137,11 @@ export async function POST(request: Request) {
                 p_mode: 'real',
                 p_description: 'Refund: Withdrawal Request Failed'
             })
-            
+
+            console.error('[B2C Failure]', mpesaData)
             return NextResponse.json({ 
-                error: mpesaData.ResponseDescription || 'M-Pesa B2C request failed' 
+                error: mpesaData.ResponseDescription || mpesaData.errorMessage || 'M-Pesa B2C request failed',
+                detail: mpesaData
             }, { status: 500 })
         }
 
@@ -116,14 +151,19 @@ export async function POST(request: Request) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
 
-        await supabaseAdmin.from('mpesa_withdrawals').insert({
-            conversation_id: mpesaData.ConversationID,
-            originator_conversation_id: mpesaData.OriginatorConversationID,
-            user_id: user.id,
-            amount: withdrawalAmount,
-            phone: phone,
-            status: 'pending'
-        })
+        try {
+            const { error: insertError } = await supabaseAdmin.from('mpesa_withdrawals').insert({
+                conversation_id: mpesaData.ConversationID,
+                originator_conversation_id: mpesaData.OriginatorConversationID,
+                user_id: user.id,
+                amount: withdrawalAmount,
+                phone: phone,
+                status: 'pending'
+            })
+            if (insertError) console.error('[Insert mpesa_withdrawals error]', insertError)
+        } catch (err) {
+            console.error('[Insert mpesa_withdrawals exception]', err)
+        }
 
         return NextResponse.json({ 
             success: true, 

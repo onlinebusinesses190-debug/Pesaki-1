@@ -15,7 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pesaki | Market & Grow",
   description: "The premier marketing platform where you can analyze markets and grow faster.",
-  manifest: "/site.webmanifest",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

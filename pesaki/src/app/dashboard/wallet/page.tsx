@@ -20,20 +20,23 @@ export default function WalletPage() {
     const isDemo = mode === 'demo'
 
     const [registeredPhone, setRegisteredPhone] = useState<string | null>(null)
+    const [balance, setBalance] = useState<number | null>(null)
     const [amount, setAmount] = useState('100')
     const [status, setStatus] = useState<DepositStatus>('idle')
     const [message, setMessage] = useState('')
+    const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
 
     const QUICK_AMOUNTS = ['50', '100', '500', '1000', '2000', '5000']
 
-    // Fetch user's registered phone on mount
+    // Fetch user's registered phone and balance on mount
     useEffect(() => {
-        const fetchPhone = async () => {
+        const fetchData = async () => {
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
+            // Get profile phone
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('phone')
@@ -43,9 +46,54 @@ export default function WalletPage() {
             if (profile?.phone) {
                 setRegisteredPhone(profile.phone)
             }
+
+            // Get wallet balance
+            const { data: wallet } = await supabase
+                .from('wallets')
+                .select('balance')
+                .eq('user_id', user.id)
+                .single()
+
+            if (wallet) {
+                setBalance(Number(wallet.balance))
+            }
         }
-        fetchPhone()
+        fetchData()
     }, [])
+
+    // Real-time listener for deposit status
+    useEffect(() => {
+        if (status !== 'waiting' || !checkoutRequestId) return
+
+        const supabase = createClient()
+        const channel = supabase
+            .channel(`deposit_${checkoutRequestId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'mpesa_deposits',
+                    filter: `checkout_request_id=eq.${checkoutRequestId}`,
+                },
+                (payload) => {
+                    if (payload.new.status === 'completed') {
+                        setStatus('success')
+                        setMessage('Payment received! Your wallet has been credited.')
+                        // Refresh balance
+                        setBalance((prev) => (prev || 0) + Number(payload.new.amount))
+                    } else if (payload.new.status === 'failed') {
+                        setStatus('failed')
+                        setMessage('The M-Pesa transaction was cancelled or failed.')
+                    }
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [status, checkoutRequestId])
 
     const handleDeposit = async () => {
         if (!amount || Number(amount) < 10) {
@@ -73,8 +121,10 @@ export default function WalletPage() {
             }
 
             setStatus('waiting')
+            setCheckoutRequestId(data.CheckoutRequestID)
             setMessage(data.CustomerMessage || 'STK Push sent! Check your phone for the M-Pesa prompt.')
-        } catch {
+        } catch (err) {
+            console.error('Deposit Error:', err)
             setStatus('failed')
             setMessage('Network error. Please check your connection and try again.')
         }
@@ -143,14 +193,23 @@ export default function WalletPage() {
 
     return (
         <div className="max-w-2xl mx-auto space-y-8 py-4">
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                    <Wallet size={28} className={activeTab === 'deposit' ? 'text-emerald-400' : 'text-orange-400'} />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Wallet</h1>
-                    <p className="text-zinc-400 text-sm">Transfer funds via M-Pesa instantly</p>
+            {/* Balance Card */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-3xl p-8">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full -mr-16 -mt-16" />
+                <div className="relative flex justify-between items-end">
+                    <div className="space-y-1">
+                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Available Balance</div>
+                        <div className="text-5xl font-black text-white flex items-baseline gap-2">
+                            <span className="text-2xl text-emerald-500 font-bold">KSh</span>
+                            {balance !== null ? balance.toLocaleString() : '---'}
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                        <div className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-tighter border border-emerald-500/20">
+                            Real Account
+                        </div>
+                        <div className="text-[10px] text-zinc-600 font-medium">Safe & Encrypted</div>
+                    </div>
                 </div>
             </div>
 
