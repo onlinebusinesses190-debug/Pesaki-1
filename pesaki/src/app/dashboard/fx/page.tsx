@@ -7,6 +7,7 @@ import { Activity, RefreshCw } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
 import { useSearchParams } from 'next/navigation'
 import { AuthGuarded } from '@/components/AuthGuarded'
+import { ModeToggle } from '@/components/dashboard/ModeToggle'
 
 const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
@@ -20,13 +21,6 @@ const getApiUrl = () => {
 const API_URL = getApiUrl();
 
 const LOT_SIZES = [0.01, 0.05, 0.1, 0.5, 1];
-const DURATIONS = [
-    { label: '5s', val: 5 / 60 },
-    { label: '10s', val: 10 / 60 },
-    { label: '1m', val: 1 },
-    { label: '5m', val: 5 },
-    { label: '24h', val: 1440 }
-];
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 // Helper to generate initial chart data
@@ -55,7 +49,6 @@ export default function FXPage() {
     const [pair, setPair] = useState('USD/KES')
     
     const [lotSize, setLotSize] = useState<number>(0.01)
-    const [duration, setDuration] = useState<{label: string, val: number}>(DURATIONS[1]) // 10s
     const [amount, setAmount] = useState<number>(100)
     
     const [loading, setLoading] = useState(false)
@@ -174,7 +167,7 @@ export default function FXPage() {
                     mode,
                     market: pair,
                     direction: direction === 'buy' ? 'UP' : 'DOWN',
-                    windowMinutes: duration.val
+                    windowMinutes: 1440 // 1440 triggers forex behavior on backend
                 })
             });
 
@@ -187,6 +180,23 @@ export default function FXPage() {
             setTradeError(err.message || 'An error occurred');
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleCloseTrade = async (predictionId: string) => {
+        try {
+            const res = await apiRequest('/games/prediction/close', {
+                method: 'POST',
+                body: JSON.stringify({ predictionId })
+            });
+
+            if (res.success) {
+                fetchOpenPositions();
+            } else {
+                alert(res.error || 'Failed to close trade');
+            }
+        } catch (err: any) {
+            alert(err.message || 'An error occurred closing the trade');
         }
     }
 
@@ -236,6 +246,8 @@ export default function FXPage() {
                     </div>
                 </div>
 
+                <ModeToggle />
+
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Chart Area */}
                     <div className="flex-1 bg-[#151924] border border-[#2b313f] rounded-xl overflow-hidden p-2 lg:p-4 min-h-[350px] lg:min-h-[500px]">
@@ -262,22 +274,6 @@ export default function FXPage() {
                                         className={`flex-1 py-2 rounded text-sm font-medium transition-colors ${lotSize === v ? 'bg-[#dcb13c] text-black' : 'bg-[#181d29] text-gray-400 hover:bg-[#202636]'}`}
                                     >
                                         {v}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Duration */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Duration</label>
-                            <div className="flex gap-2 w-full">
-                                {DURATIONS.map(d => (
-                                    <button 
-                                        key={d.label}
-                                        onClick={() => setDuration(d)}
-                                        className={`flex-1 py-2 rounded text-sm font-medium transition-colors ${duration.label === d.label ? 'bg-[#dcb13c] text-black' : 'bg-[#181d29] text-gray-400 hover:bg-[#202636]'}`}
-                                    >
-                                        {d.label}
                                     </button>
                                 ))}
                             </div>
@@ -335,7 +331,7 @@ export default function FXPage() {
 
                         {/* Footer Status */}
                         <div className="text-center text-xs text-gray-500 mt-2">
-                            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span> &bull; Timer: <span className="text-[#dcb13c] font-medium">{duration.label}</span>
+                            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span> &bull; <span className="text-[#dcb13c] font-medium">Return: 20%</span>
                         </div>
                     </div>
                 </div>
@@ -350,7 +346,15 @@ export default function FXPage() {
                         ) : (
                             openPositions.map((pos) => {
                                 const isBuy = pos.direction === 'up' || pos.direction === 'UP';
-                                const profitMock = (Math.random() - 0.5) * pos.amount * 0.1; // Simple visual mock until settled, in a real app this uses active price
+                                let profitMock = 0;
+                                if (pos.market === pair && currentPrice) {
+                                    const diff = isBuy ? (currentPrice - pos.entry_price) : (pos.entry_price - currentPrice);
+                                    if (diff > 0) {
+                                        profitMock = pos.amount * 0.20; // 20% win
+                                    } else if (diff < 0) {
+                                        profitMock = -pos.amount; // 100% loss
+                                    }
+                                }
                                 const profitColor = profitMock >= 0 ? 'text-emerald-500' : 'text-red-500';
                                 
                                 return (
@@ -360,15 +364,18 @@ export default function FXPage() {
                                                 {isBuy ? 'Buy' : 'Sell'}
                                             </div>
                                             <div className="font-semibold text-sm text-gray-200">{pos.market}</div>
-                                            <div className="text-xs text-gray-500">&times;{pos.amount / 10000} {/* Using lot mock logic */}</div>
+                                            <div className="text-xs text-gray-500">&times;{pos.amount / 10000}</div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <div className="text-xs text-gray-400">
-                                                {Math.ceil((new Date(pos.window_close_at).getTime() - Date.now()) / 1000)}s
-                                            </div>
-                                            <div className={`text-sm font-mono font-medium ${profitColor}`}>
+                                            <div className={`text-sm font-mono font-medium ${profitColor} w-20 text-right`}>
                                                 {profitMock > 0 ? '+' : ''}{profitMock.toFixed(2)} KES
                                             </div>
+                                            <button 
+                                                onClick={() => handleCloseTrade(pos.id)}
+                                                className="text-[10px] uppercase font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors"
+                                            >
+                                                Close
+                                            </button>
                                         </div>
                                     </div>
                                 )

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { placePrediction, settlePredictions } from '../../games/prediction/engine';
+import { placePrediction, settlePredictions, closePrediction } from '../../games/prediction/engine';
 import { getUpDownState } from '../../games/updown/engine';
 import { verifyAuth } from '../../middleware/auth';
 import { logger } from '../../utils/logger';
@@ -35,6 +35,26 @@ export const predictionRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/settle', { preHandler: [verifyAuth] }, async (_, reply) => {
      await settlePredictions();
      return reply.send({ success: true });
+  });
+
+  // Manual trade close route
+  const closeSchema = z.object({
+    predictionId: z.string().uuid(),
+  });
+
+  fastify.post('/close', { preHandler: [verifyAuth] }, async (request, reply) => {
+    const parsed = closeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid payload', code: 'BAD_REQUEST' });
+    }
+    
+    try {
+      const result = await closePrediction(request.user!.id, parsed.data.predictionId);
+      return reply.send(result);
+    } catch (err: any) {
+      logger.error(err, 'Trade close error');
+      return reply.code(400).send({ success: false, error: err.message, code: 'CLOSE_ERROR' });
+    }
   });
 
   // Get pending predictions for user

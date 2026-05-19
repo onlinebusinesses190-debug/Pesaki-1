@@ -77,73 +77,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: debitError.message || 'Insufficient funds' }, { status: 400 })
         }
 
-        // 3. Initiate Daraja B2C Request
-        const accessToken = await getDarajaToken()
-        const b2cShortcode = process.env.DARAJA_B2C_SHORTCODE || process.env.DARAJA_SHORTCODE;
-
-        if (!b2cShortcode) {
-            // Refund and fail early if critical config missing
-            await supabase.rpc('credit_wallet', {
-                p_user_id: user.id,
-                p_amount: withdrawalAmount,
-                p_mode: 'real',
-                p_description: 'Refund: Withdrawal Request Failed (missing B2C shortcode)'
-            })
-            return NextResponse.json({ error: 'B2C shortcode not configured' }, { status: 500 })
-        }
-
-        const securityCredential = process.env.DARAJA_B2C_SECURITY_CREDENTIAL
-        if (!securityCredential) {
-            await supabase.rpc('credit_wallet', {
-                p_user_id: user.id,
-                p_amount: withdrawalAmount,
-                p_mode: 'real',
-                p_description: 'Refund: Withdrawal Request Failed (missing security credential)'
-            })
-            return NextResponse.json({ error: 'B2C security credential not configured' }, { status: 500 })
-        }
-
-        const b2cPayload = {
-            InitiatorName: process.env.DARAJA_B2C_INITIATOR_NAME || 'testapi',
-            SecurityCredential: securityCredential,
-            CommandID: 'BusinessPayment',
-            Amount: Math.floor(withdrawalAmount),
-            PartyA: b2cShortcode,
-            PartyB: phone,
-            Remarks: 'Pesaki Withdrawal',
-            QueueTimeOutURL: process.env.DARAJA_B2C_CALLBACK_URL,
-            ResultURL: process.env.DARAJA_B2C_CALLBACK_URL,
-            Occasion: 'Wallet Withdrawal'
-        }
-
-        console.info('[B2C Request]', { phone, amount: withdrawalAmount, partyA: b2cShortcode })
-        const mpesaRes = await fetch(`${BASE_URL}/mpesa/b2c/v1/paymentrequest`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(b2cPayload),
-        })
-
-        const mpesaData = await mpesaRes.json()
-        console.info('[B2C Response]', { status: mpesaRes.status, body: mpesaData })
-
-        if (!mpesaRes.ok || mpesaData.ResponseCode !== '0') {
-            // CRITICAL: If B2C request fails immediately, refund the user
-            await supabase.rpc('credit_wallet', {
-                p_user_id: user.id,
-                p_amount: withdrawalAmount,
-                p_mode: 'real',
-                p_description: 'Refund: Withdrawal Request Failed'
-            })
-
-            console.error('[B2C Failure]', mpesaData)
-            return NextResponse.json({ 
-                error: mpesaData.ResponseDescription || mpesaData.errorMessage || 'M-Pesa B2C request failed',
-                detail: mpesaData
-            }, { status: 500 })
-        }
+        // 3. Generate Manual Withdrawal IDs
+        const conversationId = `MANUAL-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+        const originatorConversationId = `ORIG-${conversationId}`
 
         // 4. Record pending withdrawal (using Admin client to bypass RLS)
         const supabaseAdmin = createClient(
@@ -153,8 +89,8 @@ export async function POST(request: Request) {
 
         try {
             const { error: insertError } = await supabaseAdmin.from('mpesa_withdrawals').insert({
-                conversation_id: mpesaData.ConversationID,
-                originator_conversation_id: mpesaData.OriginatorConversationID,
+                conversation_id: conversationId,
+                originator_conversation_id: originatorConversationId,
                 user_id: user.id,
                 amount: withdrawalAmount,
                 phone: phone,
@@ -167,7 +103,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ 
             success: true, 
-            message: 'Withdrawal initiated successfully. You will receive an SMS shortly.',
+            message: 'Withdrawal request received. Your funds will be sent to you within 24 hours.',
             newBalance 
         })
 

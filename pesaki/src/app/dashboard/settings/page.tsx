@@ -362,15 +362,20 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="p-6 sm:p-8 space-y-6">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group">
-                                                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    <Headphones size={20} className="text-zinc-300" />
+                                            <a 
+                                                href="https://wa.me/254140399389" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-[#25D366]/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                    <MessageSquare size={20} className="text-[#25D366]" />
                                                 </div>
                                                 <div className="text-center">
-                                                    <div className="font-bold text-white">Live Chat</div>
-                                                    <div className="text-xs text-zinc-500 mt-1">Available 24/7</div>
+                                                    <div className="font-bold text-white">Chat</div>
+                                                    <div className="text-xs text-zinc-500 mt-1">WhatsApp Support</div>
                                                 </div>
-                                            </button>
+                                            </a>
                                             <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group">
                                                 <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform">
                                                     <FileText size={20} className="text-zinc-300" />

@@ -52,7 +52,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Pr
             {/* Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Active Games', value: '2', icon: <ZapIcon /> },
+                    { label: 'Active Tradings', value: FEATURED_GAMES.length.toString(), icon: <ZapIcon /> },
                     { label: 'Total Wins', value: 'KSh 0.00', icon: <History /> },
                     { label: 'Platform Rank', value: 'Beginner', icon: <Star /> },
                     { label: 'Safety Score', value: '100%', icon: <ShieldIcon /> },
@@ -69,11 +69,11 @@ export default async function DashboardHome({ searchParams }: { searchParams: Pr
                 ))}
             </div>
 
-            {/* Games Grid */}
+            {/* Tradings Grid */}
             <div className="space-y-6">
                 <div className="flex items-center justify-between px-2">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        Featured Games
+                        Featured Tradings
                     </h2>
                     <Link href={`/dashboard?mode=${mode}`} className="text-xs font-bold text-zinc-500 hover:text-white transition-colors">SEE ALL</Link>
                 </div>

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { AuthGuarded } from '@/components/AuthGuarded'
+import { ModeToggle } from '@/components/dashboard/ModeToggle'
 import {
     TrendingUp, TrendingDown, Building2,
     ArrowUp, ArrowDown, Search,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import { apiRequest } from '@/utils/api'
 import { toast } from 'sonner'
+import { useSearchParams } from 'next/navigation'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,9 @@ export default function InvestmentPage() {
     const [marketOpen, setMarketOpen] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
 
+    const searchParams = useSearchParams()
+    const mode = searchParams.get('mode') === 'real' ? 'real' : 'demo'
+
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedStock, setSelectedStock] = useState<NseStock | null>(null)
     const [prediction, setPrediction] = useState<'HIGH' | 'LOW' | null>(null)
@@ -196,7 +201,7 @@ export default function InvestmentPage() {
                     symbol: selectedStock.symbol,
                     direction: prediction,
                     amount: Number(amount),
-                    mode: 'invest',
+                    mode: mode,
                     entryPrice: selectedStock.price
                 })
             })
@@ -277,6 +282,8 @@ export default function InvestmentPage() {
                     </div>
                 </div>
             </div>
+
+            <ModeToggle />
 
             {/* ── Error Banner ── */}
             {apiError && (
@@ -449,18 +456,20 @@ export default function InvestmentPage() {
                                         />
                                     </div>
                                     <div className="flex justify-between text-xs text-muted-foreground px-1">
-                                        <span>Potential Payout:</span>
-                                        <span className="text-emerald-400 font-bold">Settled at Market Close</span>
+                                        <span>Potential Payout (30% Profit):</span>
+                                        <span className="text-emerald-400 font-bold">
+                                            {amount ? `KES ${(Number(amount) * 1.3).toFixed(2)}` : 'KES 0.00'}
+                                        </span>
                                     </div>
                                 </div>
 
                                 <button
                                     id="place-prediction-btn"
                                     onClick={handlePlacePrediction}
-                                    disabled={!prediction || Number(amount) < 10 || isPlacing}
+                                    disabled={!prediction || Number(amount) < 10 || isPlacing || !marketOpen}
                                     className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                                 >
-                                    {isPlacing ? 'PLACING...' : 'PLACE PREDICTION →'}
+                                    {isPlacing ? 'PLACING...' : (!marketOpen ? 'MARKET CLOSED' : 'PLACE PREDICTION →')}
                                 </button>
 
                                 <p className="text-[11px] text-center text-muted-foreground leading-relaxed">

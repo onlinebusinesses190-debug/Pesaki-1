@@ -26,6 +26,7 @@ export default function WalletPage() {
     const [message, setMessage] = useState('')
     const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
+    const [history, setHistory] = useState<any[]>([])
 
     const QUICK_AMOUNTS = ['50', '100', '500', '1000', '2000', '5000']
 
@@ -56,6 +57,18 @@ export default function WalletPage() {
 
             if (wallet) {
                 setBalance(Number(wallet.balance))
+            }
+
+            // Get history
+            const { data: ledger } = await supabase
+                .from('wallet_ledger')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(20)
+
+            if (ledger) {
+                setHistory(ledger)
             }
         }
         fetchData()
@@ -160,7 +173,7 @@ export default function WalletPage() {
             }
 
             setStatus('success')
-            setMessage(data.message || 'Withdrawal initiated! You will receive an M-Pesa message shortly.')
+            setMessage(data.message || 'Withdrawal request received. Your funds will be sent to you within 24 hours.')
         } catch {
             setStatus('failed')
             setMessage('Network error. Please try again.')
@@ -270,7 +283,7 @@ export default function WalletPage() {
                     <div className="bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-6 flex items-start gap-4">
                         <CheckCircle2 size={24} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                         <div>
-                            <div className="font-bold text-emerald-400 mb-1">{activeTab === 'deposit' ? 'Deposit' : 'Withdrawal'} Successful!</div>
+                            <div className="font-bold text-emerald-400 mb-1">{activeTab === 'deposit' ? 'Deposit Successful!' : 'Withdrawal Requested!'}</div>
                             <div className="text-sm text-zinc-300">{message}</div>
                             <button onClick={reset} className="mt-4 text-xs text-zinc-400 hover:text-white underline">
                                 Back to Wallet
@@ -365,18 +378,23 @@ export default function WalletPage() {
             </div>
 
             {/* How it works */}
-            {activeTab === 'deposit' && status === 'idle' && (
+            {status === 'idle' && (
                 <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
                     <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4">How it works</h3>
                     <div className="space-y-3">
-                        {[
+                        {(activeTab === 'deposit' ? [
                             { step: '1', text: 'Select an amount above.' },
                             { step: '2', text: 'Click "Pay with M-Pesa" — an STK Push prompt will be sent to your registered number.' },
                             { step: '3', text: 'Enter your M-Pesa PIN to confirm the payment.' },
                             { step: '4', text: 'Your Pesaki wallet will be credited instantly.' },
-                        ].map(({ step, text }) => (
+                        ] : [
+                            { step: '1', text: 'Enter the amount you wish to withdraw.' },
+                            { step: '2', text: 'Click "Withdraw to M-Pesa" to submit your request.' },
+                            { step: '3', text: 'Your request will be placed in a queue for processing.' },
+                            { step: '4', text: 'You will receive your funds within 24 hours.' },
+                        ]).map(({ step, text }) => (
                             <div key={step} className="flex items-start gap-3">
-                                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold flex-shrink-0 mt-0.5">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${activeTab === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
                                     {step}
                                 </div>
                                 <p className="text-sm text-zinc-400">{text}</p>
@@ -385,6 +403,53 @@ export default function WalletPage() {
                     </div>
                 </div>
             )}
+
+            {/* Transaction History */}
+            <div className="bg-card border border-border rounded-2xl p-6 mt-8">
+                <h3 className="text-lg font-bold text-white mb-4">Transaction History</h3>
+                {history.length === 0 ? (
+                    <div className="text-center py-6 text-zinc-500 text-sm border border-white/5 rounded-xl">
+                        No transactions found.
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-white/10 text-xs text-zinc-500 uppercase tracking-wider">
+                                    <th className="py-3 font-medium">Date</th>
+                                    <th className="py-3 font-medium">Type</th>
+                                    <th className="py-3 font-medium">Description</th>
+                                    <th className="py-3 font-medium text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.map((tx) => (
+                                    <tr key={tx.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                        <td className="py-3 text-sm text-zinc-400">
+                                            {new Date(tx.created_at).toLocaleString()}
+                                        </td>
+                                        <td className="py-3">
+                                            <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
+                                                tx.type === 'credit' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                                            }`}>
+                                                {tx.type}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 text-sm text-zinc-300">
+                                            {tx.description}
+                                        </td>
+                                        <td className={`py-3 text-sm font-bold text-right ${
+                                            tx.type === 'credit' ? 'text-emerald-400' : 'text-white'
+                                        }`}>
+                                            {tx.type === 'credit' ? '+' : '-'}KSh {Number(tx.amount).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

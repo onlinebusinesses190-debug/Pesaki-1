@@ -31,6 +31,9 @@ export default function AdminDashboard() {
     const [stats, setStats] = useState<AdminStats | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    
+    const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([])
+    const [loadingWithdrawals, setLoadingWithdrawals] = useState(true)
 
     const fetchStats = async () => {
         setLoading(true)
@@ -43,6 +46,18 @@ export default function AdminDashboard() {
             toast.error('Failed to load admin metrics')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchPendingWithdrawals = async () => {
+        setLoadingWithdrawals(true)
+        try {
+            const res = await apiRequest('/api/admin/withdrawals')
+            setPendingWithdrawals(res.withdrawals || [])
+        } catch (err: any) {
+            toast.error('Failed to load pending withdrawals')
+        } finally {
+            setLoadingWithdrawals(false)
         }
     }
 
@@ -60,8 +75,24 @@ export default function AdminDashboard() {
         }
     }
 
+    const handleWithdrawalAction = async (conversationId: string, action: 'approve' | 'reject') => {
+        const loadingToast = toast.loading(`Processing withdrawal...`)
+        try {
+            const res = await apiRequest('/api/admin/withdrawals', {
+                method: 'POST',
+                body: JSON.stringify({ conversationId, action })
+            })
+            toast.success(res.message, { id: loadingToast })
+            fetchPendingWithdrawals()
+            fetchStats() // Refresh balances if rejected
+        } catch (err: any) {
+            toast.error(err.message || 'Action failed', { id: loadingToast })
+        }
+    }
+
     useEffect(() => {
         fetchStats()
+        fetchPendingWithdrawals()
     }, [])
 
     if (loading && !stats) {
@@ -93,7 +124,7 @@ export default function AdminDashboard() {
                     <p className="text-zinc-400 mt-1">Real-time health and liquidity metrics for Pesaki.</p>
                 </div>
                 <button 
-                    onClick={fetchStats}
+                    onClick={() => { fetchStats(); fetchPendingWithdrawals(); }}
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-400 hover:text-white transition-all"
                 >
                     <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -197,6 +228,65 @@ export default function AdminDashboard() {
                             Verify Bank Reserve
                         </button>
                     </div>
+                </div>
+
+                {/* Pending Withdrawals Queue */}
+                <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-6">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+                         <Activity size={20} className="text-orange-500" /> Pending Manual Withdrawals
+                    </h2>
+                    
+                    {loadingWithdrawals ? (
+                        <div className="flex items-center justify-center p-8">
+                            <RefreshCw className="w-6 h-6 animate-spin text-zinc-500" />
+                        </div>
+                    ) : pendingWithdrawals.length === 0 ? (
+                        <div className="text-center p-8 border border-white/5 rounded-xl bg-white/[0.02]">
+                            <p className="text-zinc-500 text-sm">No pending withdrawals in the queue.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-border text-xs text-zinc-500 uppercase tracking-wider">
+                                        <th className="py-3 px-4 font-medium">Time</th>
+                                        <th className="py-3 px-4 font-medium">Phone</th>
+                                        <th className="py-3 px-4 font-medium">Amount</th>
+                                        <th className="py-3 px-4 font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pendingWithdrawals.map((w) => (
+                                        <tr key={w.conversation_id} className="border-b border-border hover:bg-white/[0.02] transition-colors">
+                                            <td className="py-3 px-4 text-sm text-zinc-400">
+                                                {new Date(w.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="py-3 px-4 font-bold text-white">
+                                                {w.phone}
+                                            </td>
+                                            <td className="py-3 px-4 font-bold text-emerald-400">
+                                                KSh {Number(w.amount).toLocaleString()}
+                                            </td>
+                                            <td className="py-3 px-4 flex justify-end gap-2">
+                                                <button 
+                                                    onClick={() => handleWithdrawalAction(w.conversation_id, 'approve')}
+                                                    className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded transition-colors"
+                                                >
+                                                    Approve (Sent)
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleWithdrawalAction(w.conversation_id, 'reject')}
+                                                    className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold rounded transition-colors"
+                                                >
+                                                    Reject & Refund
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

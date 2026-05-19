@@ -4,6 +4,67 @@ import { redis } from '../../lib/redis';
 import { debit, credit } from '../../wallet/service';
 import { fetchNsePrice, isNseSymbol } from '../../utils/nse';
 
+export const closePrediction = async (userId: string, predictionId: string) => {
+  // Fetch prediction
+  const { data: prediction, error: fetchErr } = await supabase
+    .from('predictions')
+    .select('*')
+    .eq('id', predictionId)
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchErr || !prediction) {
+    throw new Error('Prediction not found or already closed');
+  }
+
+  const { market, direction, entry_price, amount, mode } = prediction;
+
+  // Get current price
+  let closePrice: number | undefined;
+  if (isNseSymbol(market)) {
+    closePrice = await fetchNsePrice(market);
+  } else {
+    const pStr = await redis.get(`market:${market}`);
+    if (pStr) closePrice = parseFloat(String(pStr));
+  }
+
+  if (closePrice === undefined) {
+    throw new Error('Current market price unavailable');
+  }
+
+  // Calculate profit/loss
+  // Hardcoded gamified logic: +20% win, -100% loss
+  const isUp = direction === 'up' || direction === 'UP';
+  const won = isUp ? closePrice > entry_price : closePrice < entry_price;
+  
+  let returnAmount = 0;
+  let profit = 0;
+  
+  if (won) {
+    profit = amount * 0.20; // 20% profit
+    returnAmount = amount + profit;
+  } else {
+    profit = -amount; // 100% loss
+    returnAmount = 0;
+  }
+  
+  if (returnAmount < 0) returnAmount = 0; // Can't lose more than margin
+
+  // Credit wallet
+  if (returnAmount > 0) {
+    await credit(userId, Number(returnAmount.toFixed(2)), mode, `Trade Closed: ${market}`);
+  }
+
+  // Update DB
+  await supabase.from('predictions').update({ 
+    status: 'settled', 
+    close_price: closePrice 
+  }).eq('id', predictionId);
+
+  return { success: true, closePrice, returnAmount, profit };
+};
+
 export const placePrediction = async (
   userId: string, 
   market: string, 
@@ -37,7 +98,8 @@ export const placePrediction = async (
       amount: amount,
       mode: mode,
       status: 'pending',
-      window_close_at: closeDate.toISOString()
+      // For forex trades, window_close_at is set far in the future
+      window_close_at: windowMinutes === 1440 ? closeDate.toISOString() : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     }
   ]).select('*').single();
 
@@ -94,7 +156,9 @@ export const settlePredictions = async () => {
                     (direction === 'down' && closePrice < entry_price);
                     
         if (won) {
-            const winAmount = Number((amount * 1.9).toFixed(2)); // 1.9x payout = 5% house edge
+            // Invest (NSE) pays out 30% profit (1.3x). Other markets use default 1.9x payout.
+            const payoutMultiplier = isNseSymbol(market) ? 1.3 : 1.9;
+            const winAmount = Number((amount * payoutMultiplier).toFixed(2)); 
             await credit(user_id, winAmount, mode, `Prediction Won on ${market}`);
         }
         
