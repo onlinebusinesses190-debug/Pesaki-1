@@ -96,9 +96,25 @@ export async function POST(request: Request) {
                 phone: phone,
                 status: 'pending'
             })
-            if (insertError) console.error('[Insert mpesa_withdrawals error]', insertError)
-        } catch (err) {
+            if (insertError) {
+                console.error('[Insert mpesa_withdrawals error]', insertError)
+                await supabase.rpc('credit_wallet', {
+                    p_user_id: user.id,
+                    p_amount: withdrawalAmount,
+                    p_mode: 'real',
+                    p_description: `Refund: Internal system error recording withdrawal`
+                })
+                return NextResponse.json({ error: 'Failed to record withdrawal request. Balance refunded.' }, { status: 500 })
+            }
+        } catch (err: any) {
             console.error('[Insert mpesa_withdrawals exception]', err)
+            await supabase.rpc('credit_wallet', {
+                p_user_id: user.id,
+                p_amount: withdrawalAmount,
+                p_mode: 'real',
+                p_description: `Refund: Internal system error recording withdrawal`
+            })
+            return NextResponse.json({ error: 'Failed to record withdrawal request. Balance refunded.' }, { status: 500 })
         }
 
         return NextResponse.json({ 

@@ -36,7 +36,7 @@ export async function GET(request: Request) {
                 status,
                 created_at,
                 user_id,
-                profiles:user_id(phone)
+                profiles(phone)
             `)
             .eq('status', 'pending')
             .order('created_at', { ascending: false })
