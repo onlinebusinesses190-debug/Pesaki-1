@@ -23,7 +23,7 @@ export const closePrediction = async (userId: string, predictionId: string) => {
   // Get current price
   let closePrice: number | undefined;
   if (isNseSymbol(market)) {
-    closePrice = await fetchNsePrice(market);
+    closePrice = (await fetchNsePrice(market)) ?? undefined;
   } else {
     const pStr = await redis.get(`market:${market}`);
     if (pStr) closePrice = parseFloat(String(pStr));
