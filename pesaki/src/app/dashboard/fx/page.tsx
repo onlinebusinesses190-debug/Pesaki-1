@@ -21,7 +21,7 @@ const getApiUrl = () => {
 const API_URL = getApiUrl();
 
 const LOT_SIZES = [0.01, 0.05, 0.1, 0.5, 1];
-const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
+const AMOUNTS = [10, 50, 100, 500, 1000, 2000];
 
 // Helper to generate initial chart data
 const generateData = (count: number, basePrice: number) => {
@@ -49,7 +49,7 @@ export default function FXPage() {
     const [pair, setPair] = useState('USD/KES')
     
     const [lotSize, setLotSize] = useState<number>(0.01)
-    const [amount, setAmount] = useState<number>(100)
+    const [amount, setAmount] = useState<number>(10)
     
     const [loading, setLoading] = useState(false)
     const [tradeError, setTradeError] = useState<string | null>(null)
@@ -73,7 +73,7 @@ export default function FXPage() {
 
             if (isInitial) {
                 setCurrentPrice(result.price)
-                const initialHistory = generateData(100, result.price)
+                const initialHistory = generateData(10, result.price)
                 setData(initialHistory)
             }
         } catch (err) {
@@ -206,7 +206,7 @@ export default function FXPage() {
                 <div className="flex items-center justify-between px-2">
                     <div>
                         <h1 className="text-xl lg:text-3xl font-bold text-white flex items-center gap-2">
-                            <Activity className="text-primary w-5 h-5 lg:w-8 lg:h-8" /> Pesaki FX
+                            <Activity className="text-primary w-5 h-5 lg:w-8 lg:h-8" /> </Binary> FX
                         </h1>
                         <div className="flex items-center gap-2 mt-1">
                             <select
@@ -223,7 +223,7 @@ export default function FXPage() {
                                 <option value="XAU/USD">XAU/USD</option>
                             </select>
                             <span className="text-muted-foreground text-sm">•</span>
-                            <span className={`text-xs font-mono font-bold ${currentPrice ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                            <span className={`text-xs font-mono font-bold ${currentPrice  ? 'text-emerald-400' : 'text-zinc-500'}`}>
                                 {currentPrice ? currentPrice.toFixed(currentPrice > 50 ? 2 : 4) : 'Loading...'}
                             </span>
                         </div>

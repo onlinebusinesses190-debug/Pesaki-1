@@ -50,14 +50,14 @@ function DashboardShell({ wallet }: { wallet: WalletState | null }) {
 
     const balance = wallet
         ? (mode === 'real' ? wallet.balance : wallet.demo_balance)
-        : (mode === 'demo' ? 10000 : 0)
+        : (mode === 'demo' ? 1000 : 0)
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Home },
         { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
-        { name: 'Pesaki FX', href: '/dashboard/fx', icon: LineChart },
+        { name: 'Binary FX', href: '/dashboard/fx', icon: LineChart },
         { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp },
         { name: 'AviMarket', href: '/dashboard/aviator', icon: Plane },
         { name: 'Market Spin', href: '/dashboard/spin', icon: Disc },
@@ -209,7 +209,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
 
     const balance = wallet
         ? (mode === 'real' ? wallet.balance : wallet.demo_balance)
-        : (mode === 'demo' ? 10000 : 0)
+        : (mode === 'demo' ? 1000 : 0)
 
     const [role, setRole] = useState<string | null>(null)
 
@@ -232,7 +232,7 @@ function SidebarContent({ wallet, isSidebarOpen, toggleSidebar }: any) {
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Home },
         { name: 'Wallet', href: '/dashboard/wallet', icon: Wallet },
-        { name: 'Pesaki FX', href: '/dashboard/fx', icon: LineChart },
+        { name: 'Binary FX', href: '/dashboard/fx', icon: LineChart },
         { name: 'Up & Down', href: '/dashboard/up-down', icon: TrendingUp },
         { name: 'AviMarket', href: '/dashboard/aviator', icon: Plane },
         { name: 'Market Spin', href: '/dashboard/spin', icon: Disc },

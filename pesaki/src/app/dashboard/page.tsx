@@ -11,10 +11,10 @@ export default async function DashboardHome({ searchParams }: { searchParams: Pr
 
     const balance = wallet
         ? (isDemo ? wallet.demo_balance : wallet.balance)
-        : (isDemo ? 10000 : 0)
+        : (isDemo ? 1000 : 0)
 
     const FEATURED_GAMES = [
-        { name: 'Pesaki FX', icon: <TrendingUp />, href: '/dashboard/fx', color: 'bg-emerald-500', desc: 'Trade Forex pairs with high leverage.' },
+        { name: 'Binary FX', icon: <TrendingUp />, href: '/dashboard/fx', color: 'bg-emerald-500', desc: 'Trade Forex pairs with high leverage.' },
         { name: 'AviMarket', icon: <Plane />, href: '/dashboard/aviator', color: 'bg-red-500', desc: 'Market-linked multiplier — predict how far the market flies.' },
         { name: 'Up & Down', icon: <ArrowUpRight />, href: '/dashboard/up-down', color: 'bg-blue-500', desc: 'Simple market direction prediction.' },
         { name: 'Market Spin', icon: <Disc />, href: '/dashboard/spin', color: 'bg-purple-500', desc: 'Spin the market wheel to win instant prizes.' },

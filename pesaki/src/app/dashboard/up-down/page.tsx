@@ -37,7 +37,7 @@ interface HistoryEntry {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 const AMOUNT_PRESETS = ['50', '100', '200', '500']
-const PAYOUT = 1.9
+const PAYOUT =1.5
 const TOTAL_SECONDS = 10
 
 // ── Countdown Ring Component ──────────────────────────────────────────────────
