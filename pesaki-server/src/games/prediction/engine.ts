@@ -156,8 +156,8 @@ export const settlePredictions = async () => {
                     (direction === 'down' && closePrice < entry_price);
                     
         if (won) {
-            // Invest (NSE) pays out 30% profit (1.3x). Other markets use default 1.9x payout.
-            const payoutMultiplier = isNseSymbol(market) ? 1.3 : 1.9;
+            // Invest (NSE) pays out 30% profit (1.3x). Other markets use default1.5x payout.
+            const payoutMultiplier = isNseSymbol(market) ? 1.3 :1.5;
             const winAmount = Number((amount * payoutMultiplier).toFixed(2)); 
             await credit(user_id, winAmount, mode, `Prediction Won on ${market}`);
         }

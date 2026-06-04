@@ -43,7 +43,7 @@ const DEFAULT_MARKET = 'USD/KES';
 const OPEN_DURATION   = 10_000; // 10 seconds
 const LOCKED_DURATION =  2_000; //  2 seconds
 const RESULT_DURATION =  3_000; //  3 seconds
-const GROWTH_MULTIPLIER = 1.9;
+const GROWTH_MULTIPLIER =1.5;
 const MAX_HISTORY = 20;
 
 // ── State ────────────────────────────────────────────────────────────────────

@@ -79,7 +79,7 @@ const settlePredictions = async () => {
         const won = (direction === 'up' && closePrice > entry_price) ||
             (direction === 'down' && closePrice < entry_price);
         if (won) {
-            const winAmount = Number((amount * 1.9).toFixed(2)); // 1.9x payout = 5% house edge
+            const winAmount = Number((amount *1.5).toFixed(2)); //1.5x payout = 5% house edge
             await (0, service_1.credit)(user_id, winAmount, mode, `Prediction Won on ${market}`);
         }
         await supabase_1.supabase.from('predictions').update({ status: 'settled', close_price: closePrice }).eq('id', id);

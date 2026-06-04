@@ -55,7 +55,7 @@ Reusable presentation and logic units:
 
 The platform focuses on variety and deep engagement, organizing content around the following models:
 
-### 1. Pesaki FX (`/dashboard/fx`)
+### 1. Binary FX (`/dashboard/fx`)
 A fully-fledged Forex simulation and trading hub providing real-time views and leverage trading concepts translated for intuitive gameplay.
 
 ### 2. Kenyan Market (Invest) (`/dashboard/invest`)
