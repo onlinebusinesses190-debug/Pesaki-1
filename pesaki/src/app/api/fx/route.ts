@@ -58,8 +58,8 @@ export async function GET(request: Request) {
             symbol: pair.symbol,
             name: pair.name,
             price: price,
-            change: (Math.random() * 0.001 - 0.0005).toFixed(5),
-            changePercent: (Math.random() * 0.1 - 0.05).toFixed(2),
+            change: Number((Math.random() * 0.001 - 0.0005).toFixed(5)),
+            changePercent: Number((Math.random() * 0.1 - 0.05).toFixed(2)),
             timestamp: new Date().toISOString()
         }
 
