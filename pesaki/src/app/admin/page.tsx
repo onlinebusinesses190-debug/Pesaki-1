@@ -1,120 +1,246 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, RefreshCw, AlertTriangle, PlayCircle, PauseCircle } from 'lucide-react'
+import { Save, Trash2, UserPlus, LogOut } from 'lucide-react'
+
+const ADMIN_PHONE = '0704606396'
+const ADMIN_PASSWORD = '12345678'
+
+interface AdminUser {
+    phone: string
+    password: string
+}
+
+const initialUsers: AdminUser[] = [
+    { phone: ADMIN_PHONE, password: ADMIN_PASSWORD }
+]
 
 export default function AdminDashboard() {
-    const [rtp, setRtp] = useState('92')
-    const [companies, setCompanies] = useState([
-        { name: 'Safaricom', result: 'PENDING' },
-        { name: 'Equity Group', result: 'PENDING' },
-        { name: 'KCB Group', result: 'PENDING' }
-    ])
+    const [loggedIn, setLoggedIn] = useState(false)
+    const [loginPhone, setLoginPhone] = useState('')
+    const [loginPassword, setLoginPassword] = useState('')
+    const [loginError, setLoginError] = useState('')
+
+    const [users, setUsers] = useState<AdminUser[]>(initialUsers)
+    const [newPhone, setNewPhone] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [editPasswords, setEditPasswords] = useState<Record<string, string>>({})
+    const [message, setMessage] = useState('')
+
+    const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        if (loginPhone === ADMIN_PHONE && loginPassword === ADMIN_PASSWORD) {
+            setLoggedIn(true)
+            setLoginError('')
+            setLoginPhone('')
+            setLoginPassword('')
+            setMessage('Welcome, admin!')
+            return
+        }
+
+        setLoginError('Invalid admin credentials. Use phone 0704606396 and password 12345678.')
+    }
+
+    const handleLogout = () => {
+        setLoggedIn(false)
+        setMessage('Logged out successfully.')
+    }
+
+    const handleAddUser = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        setMessage('')
+
+        const trimmedPhone = newPhone.trim()
+        const trimmedPassword = newPassword.trim()
+
+        if (!trimmedPhone || !trimmedPassword) {
+            setMessage('Phone and password are required.')
+            return
+        }
+
+        if (users.some((user) => user.phone === trimmedPhone)) {
+            setMessage('A user with that phone number already exists.')
+            return
+        }
+
+        setUsers([...users, { phone: trimmedPhone, password: trimmedPassword }])
+        setNewPhone('')
+        setNewPassword('')
+        setMessage(`User ${trimmedPhone} added.`)
+    }
+
+    const handleDeleteUser = (phone: string) => {
+        if (phone === ADMIN_PHONE) {
+            setMessage('The admin account cannot be deleted.')
+            return
+        }
+        setUsers(users.filter((user) => user.phone !== phone))
+        setMessage(`User ${phone} deleted.`)
+    }
+
+    const handlePasswordEdit = (phone: string, password: string) => {
+        setEditPasswords({ ...editPasswords, [phone]: password })
+    }
+
+    const savePassword = (phone: string) => {
+        const newPass = (editPasswords[phone] ?? '').trim()
+        if (!newPass) {
+            setMessage('Password cannot be empty.')
+            return
+        }
+        setUsers(users.map((user) => user.phone === phone ? { ...user, password: newPass } : user))
+        setMessage(`Password updated for ${phone}.`)
+    }
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Main Control Panel</h1>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Profit Overview */}
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <h3 className="text-zinc-400 text-sm mb-2">Total House Profit (Today)</h3>
-                    <div className="text-4xl font-bold text-green-500 flex items-baseline gap-2">
-                        KSh 45,290 <span className="text-sm font-normal text-zinc-500">+12%</span>
-                    </div>
+            <header className="flex items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold">Admin Control Panel</h1>
+                    <p className="text-sm text-zinc-400">Only the configured admin can access this page.</p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <h3 className="text-zinc-400 text-sm mb-2">Active Users (Real-Time)</h3>
-                    <div className="text-4xl font-bold text-blue-500">128</div>
-                </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <h3 className="text-zinc-400 text-sm mb-2">Pending Withdrawals</h3>
-                    <div className="text-4xl font-bold text-orange-500">4</div>
-                </div>
-            </div>
+                {loggedIn && (
+                    <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">
+                        <LogOut size={16} /> Logout
+                    </button>
+                )}
+            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Game Control (RTP) */}
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold flex items-center gap-2">
-                            <SettingsIcon /> Game Logic Engine
-                        </h3>
-                        <span className="px-2 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded">ACTIVE</span>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm text-zinc-400">Global RTP (Return to Player) %</label>
-                            <div className="flex gap-4">
-                                <input
-                                    type="number"
-                                    value={rtp}
-                                    onChange={(e) => setRtp(e.target.value)}
-                                    className="bg-black border border-zinc-700 rounded-lg px-4 py-2 w-full font-bold"
-                                />
-                                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-bold flex items-center gap-2">
-                                    <Save size={18} /> Save
-                                </button>
-                            </div>
-                            <p className="text-xs text-zinc-500">
-                                Setting lower RTP increases House Edge. Current Edge: {100 - parseInt(rtp)}%
-                            </p>
+            {!loggedIn ? (
+                <div className="max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 p-8 shadow-xl shadow-black/30">
+                    <h2 className="text-xl font-semibold mb-4">Admin Sign In</h2>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="mb-2 block text-sm text-zinc-400">Phone number</label>
+                            <input
+                                value={loginPhone}
+                                onChange={(e) => setLoginPhone(e.target.value)}
+                                placeholder="0704606396"
+                                className="w-full rounded-2xl border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                            />
                         </div>
-
-                        <div className="p-4 bg-red-900/10 border border-red-900/30 rounded-lg space-y-3">
-                            <h4 className="font-bold text-red-500 flex items-center gap-2">
-                                <AlertTriangle size={16} /> Emergeny Controls
-                            </h4>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button className="py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded">
-                                    FREEZE ALL GAMES
-                                </button>
-                                <button className="py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded">
-                                    RESET SERVER
-                                </button>
-                            </div>
+                        <div>
+                            <label className="mb-2 block text-sm text-zinc-400">Password</label>
+                            <input
+                                type="password"
+                                value={loginPassword}
+                                onChange={(e) => setLoginPassword(e.target.value)}
+                                placeholder="********"
+                                className="w-full rounded-2xl border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                            />
                         </div>
-                    </div>
-                </div>
-
-                {/* Investment Results Manager */}
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold">NSE Results Manager</h3>
-                        <button className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                            <RefreshCw size={12} /> Sync
+                        <button type="submit" className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500">
+                            Sign in
                         </button>
-                    </div>
+                        {loginError && <div className="rounded-2xl bg-red-900/50 p-3 text-sm text-red-300">{loginError}</div>}
+                    </form>
+                </div>
+            ) : (
+                <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-8">
+                        <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8 shadow-xl shadow-black/20">
+                            <h2 className="text-2xl font-semibold mb-4">User Management</h2>
+                            <p className="text-sm text-zinc-400 mb-6">
+                                Admin account: <span className="font-medium">{ADMIN_PHONE}</span>. The admin account cannot be deleted.
+                            </p>
 
-                    <div className="space-y-2">
-                        <div className="grid grid-cols-12 text-sm text-zinc-500 mb-2 px-2">
-                            <div className="col-span-6">Company</div>
-                            <div className="col-span-6">Result Set</div>
-                        </div>
-                        {companies.map((c, i) => (
-                            <div key={i} className="grid grid-cols-12 items-center bg-black/40 p-3 rounded-lg border border-white/5">
-                                <div className="col-span-6 font-medium">{c.name}</div>
-                                <div className="col-span-6 flex gap-2">
-                                    <button className="flex-1 py-1 bg-green-500/20 text-green-500 border border-green-500/30 rounded hover:bg-green-500/30 text-xs font-bold">
-                                        HIGH
-                                    </button>
-                                    <button className="flex-1 py-1 bg-red-500/20 text-red-500 border border-red-500/30 rounded hover:bg-red-500/30 text-xs font-bold">
-                                        LOW
-                                    </button>
+                            <div className="space-y-6">
+                                <form onSubmit={handleAddUser} className="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label className="mb-2 block text-sm text-zinc-400">Phone</label>
+                                        <input
+                                            value={newPhone}
+                                            onChange={(e) => setNewPhone(e.target.value)}
+                                            placeholder="Enter phone"
+                                            className="w-full rounded-2xl border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-2 block text-sm text-zinc-400">Password</label>
+                                        <input
+                                            type="password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Enter password"
+                                            className="w-full rounded-2xl border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <button type="submit" className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-500">
+                                            <UserPlus size={16} /> Add user
+                                        </button>
+                                    </div>
+                                </form>
+
+                                {message && <div className="rounded-2xl bg-blue-900/50 p-4 text-sm text-blue-200">{message}</div>}
+
+                                <div className="space-y-4">
+                                    {users.map((user) => (
+                                        <div key={user.phone} className="rounded-3xl border border-zinc-800 bg-black/30 p-4">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div>
+                                                    <div className="text-sm text-zinc-400">Phone</div>
+                                                    <div className="font-medium text-white">{user.phone}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteUser(user.phone)}
+                                                    className="inline-flex items-center gap-2 rounded-2xl border border-red-700 bg-red-700/10 px-4 py-2 text-sm text-red-200 hover:bg-red-700/20 disabled:cursor-not-allowed"
+                                                    disabled={user.phone === ADMIN_PHONE}
+                                                >
+                                                    <Trash2 size={14} /> Delete
+                                                </button>
+                                            </div>
+                                            <div className="mt-4 grid gap-3 sm:grid-cols-[1.4fr_0.6fr]">
+                                                <div>
+                                                    <label className="mb-2 block text-sm text-zinc-400">Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={editPasswords[user.phone] ?? user.password}
+                                                        onChange={(e) => handlePasswordEdit(user.phone, e.target.value)}
+                                                        className="w-full rounded-2xl border border-zinc-700 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => savePassword(user.phone)}
+                                                    className="inline-flex h-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500"
+                                                >
+                                                    <Save size={16} /> Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        ))}
+                        </section>
                     </div>
-                    <button className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 font-bold rounded-lg border border-zinc-700">
-                        PUBLISH DAILY RESULTS
-                    </button>
+
+                    <aside className="space-y-6">
+                        <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8 shadow-xl shadow-black/20">
+                            <h3 className="text-xl font-semibold mb-3">Admin access</h3>
+                            <p className="text-sm text-zinc-400 mb-4">
+                                Your admin account is locked to the fixed credentials below. Use this area to manage extra users and update passwords.
+                            </p>
+                            <div className="rounded-3xl bg-zinc-900/80 p-4">
+                                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Current admin login</p>
+                                <div className="mt-3 space-y-2 text-sm">
+                                    <div><span className="font-medium text-white">Phone:</span> {ADMIN_PHONE}</div>
+                                    <div><span className="font-medium text-white">Password:</span> {ADMIN_PASSWORD}</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8 shadow-xl shadow-black/20">
+                            <h3 className="text-xl font-semibold mb-3">Current user count</h3>
+                            <div className="rounded-3xl bg-black/50 p-6 text-center">
+                                <div className="text-5xl font-bold text-white">{users.length}</div>
+                                <div className="mt-2 text-sm text-zinc-400">managed user accounts</div>
+                            </div>
+                        </section>
+                    </aside>
                 </div>
-            </div>
+            )}
         </div>
     )
-}
-
-function SettingsIcon() {
-    return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
 }
