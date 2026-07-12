@@ -24,12 +24,14 @@ export default async function HomePage() {
   let balance = 0;
   let totalEarnings = 0;
   let referralEarnings = 0;
+
   if (user) {
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance, total_earnings, referral_earnings')
       .eq('user_id', user.id)
       .single();
+    
     if (wallet) {
       balance = wallet.balance || 0;
       totalEarnings = wallet.total_earnings || 0;
@@ -37,7 +39,9 @@ export default async function HomePage() {
     }
   }
 
-  let recentTransactions = [];
+  // ✅ FIXED: Explicitly type the array
+  let recentTransactions: { id: string; type: string; date: string; status: string; amount: number }[] = [];
+
   if (user) {
     const { data: txs } = await supabase
       .from('transactions')
@@ -45,8 +49,9 @@ export default async function HomePage() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5);
+    
     if (txs) {
-      recentTransactions = txs.map(t => ({
+      recentTransactions = txs.map((t: any) => ({
         id: t.id,
         type: t.type,
         date: new Date(t.created_at).toLocaleDateString(),
