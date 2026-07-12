@@ -1,250 +1,137 @@
 import Link from "next/link";
-import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowLeftRight,
-  LineChart,
-  Bell,
-  Eye,
-  EyeOff,
-  TrendingUp,
-  ChevronRight,
-  Sparkles,
-  LogIn,
-} from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, Trophy, Zap, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 
-const fmt = (amount: number) => `KES ${amount?.toLocaleString() ?? 0}`;
-
-export default async function HomePage() {
+export default async function Home() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // --- FETCH YOUR REAL DATA ---
-  let balance = 0;
-  let totalEarnings = 0;
-  let referralEarnings = 0;
-
+  // If user is logged in, redirect to mode selection or dashboard
   if (user) {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance, total_earnings, referral_earnings')
-      .eq('user_id', user.id)
-      .single();
-    
-    if (wallet) {
-      balance = wallet.balance || 0;
-      totalEarnings = wallet.total_earnings || 0;
-      referralEarnings = wallet.referral_earnings || 0;
-    }
+    redirect('/mode-selection');
   }
-
-  // ✅ FIXED: Explicitly type the array
-  let recentTransactions: { id: string; type: string; date: string; status: string; amount: number }[] = [];
-
-  if (user) {
-    const { data: txs } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    if (txs) {
-      recentTransactions = txs.map((t: any) => ({
-        id: t.id,
-        type: t.type,
-        date: new Date(t.created_at).toLocaleDateString(),
-        status: t.status,
-        amount: t.amount,
-      }));
-    }
-  }
-
-  const stats = [
-    { label: "Active Trades", value: "12", trend: "+3" },
-    { label: "Jobs Completed", value: "47", trend: "+5" },
-    { label: "Investment Growth", value: "+18.4%", trend: "YTD" },
-    { label: "Businesses Funded", value: "3", trend: "Active" },
-  ];
-
-  const opportunities = [
-    { category: "KAZI LINK", title: "Senior House Help — Karen", pay: "KES 25,000/mo", tag: "New" },
-    { category: "FUNDING", title: "Agritech Startup — Series Seed", pay: "Up to KES 2M", tag: "Hot" },
-    { category: "ANNOUNCEMENT", title: "PESAKI Savings 12% APY", pay: "Limited time", tag: "Featured" },
-    { category: "KAZI LINK", title: "Event Workers — Nairobi Expo", pay: "KES 3,500/day", tag: "Urgent" },
-  ];
-
-  const displayName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Guest";
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white selection:bg-primary selection:text-white">
+      {/* Decorative background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[10%] right-[-5%] w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]" />
+      </div>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-800 to-black px-5 pb-8 pt-6 text-white">
-        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-yellow-500/20 blur-3xl" />
-        <div className="relative flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome{user ? " back" : ""},</p>
-            <h1 className="truncate text-2xl font-bold">{displayName} 👋</h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
-              <Bell className="h-5 w-5" />
-            </button>
-            {user ? (
-              <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-full bg-yellow-500 font-bold text-black">
-                {(displayName[0] ?? "P").toUpperCase()}
-              </Link>
-            ) : (
-              <Link href="/login" className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur">
-                <LogIn className="h-3.5 w-3.5" /> Sign in
-              </Link>
-            )}
-          </div>
-        </div>
-
-        <div className="relative mt-6 rounded-3xl bg-white/10 p-5 backdrop-blur-md ring-1 ring-white/15">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-wider opacity-80">Available Balance</p>
-            <EyeOff className="h-4 w-4 opacity-80" />
-          </div>
-          <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {fmt(balance)}
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-xl bg-white/10 p-2.5">
-              <p className="opacity-70">Total Earnings</p>
-              <p className="mt-0.5 font-semibold">{fmt(totalEarnings)}</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-2.5">
-              <p className="opacity-70">Referral Earnings</p>
-              <p className="mt-0.5 font-semibold">{fmt(referralEarnings)}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Actions */}
-      <section className="-mt-5 px-5">
-        <div className="grid grid-cols-4 gap-2 rounded-xl bg-zinc-900/50 p-3 shadow-xl backdrop-blur">
-          {[
-            { label: "Deposit", icon: ArrowDownToLine, href: "/wallet" },
-            { label: "Withdraw", icon: ArrowUpFromLine, href: "/wallet" },
-            { label: "Transfer", icon: ArrowLeftRight, href: "/wallet" },
-            { label: "Trading", icon: LineChart, href: "/trading" },
-          ].map((a) => (
-            <Link
-              key={a.label}
-              href={a.href}
-              className="flex flex-col items-center gap-1.5 rounded-xl p-2 transition-colors hover:bg-white/5"
-            >
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-                <a.icon className="h-5 w-5" />
-              </span>
-              <span className="text-[11px] font-medium">{a.label}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Stats Grid */}
-      <section className="mt-5 px-5">
-        <div className="grid grid-cols-2 gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-xl bg-zinc-900/50 p-3">
-              <p className="text-xs text-zinc-400">{s.label}</p>
-              <p className="text-xl font-bold text-white">{s.value}</p>
-              <p className="text-[10px] text-emerald-400">{s.trend}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Promo Banner */}
-      <section className="mt-6 px-5">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500 to-yellow-600 p-5 text-black">
-          <Sparkles className="absolute -right-2 -top-2 h-24 w-24 opacity-20" />
-          <p className="text-[11px] font-semibold uppercase tracking-wider">Featured</p>
-          <h3 className="mt-1 max-w-[80%] text-lg font-bold leading-snug">
-            Grow your savings at 12% APY
-          </h3>
-          <p className="mt-1 max-w-[85%] text-xs opacity-80">
-            Lock funds for 90 days and earn premium interest.
-          </p>
-          <Link
-            href="/banking"
-            className="mt-3 inline-flex items-center gap-1 rounded-full bg-black px-3.5 py-1.5 text-xs font-semibold text-white"
-          >
-            Start saving <ChevronRight className="h-3.5 w-3.5" />
+      {/* Navigation */}
+      <nav className="relative z-10 border-b border-white/5 bg-black/50 backdrop-blur-md">
+        <div className="container mx-auto px-6 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Pesaki Logo" width={140} height={40} className="h-10 w-auto" priority />
           </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors">
+              Login
+            </Link>
+            <Link
+              href="/login"
+              className="px-5 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-zinc-200 transition-all hover:scale-105"
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
-      </section>
+      </nav>
 
-      {/* Latest Opportunities */}
-      <section className="mt-7 px-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Latest opportunities</h2>
-          <Link href="/kazi" className="text-xs font-semibold text-yellow-500">See all</Link>
-        </div>
-        <div className="mt-2 space-y-2.5">
-          {opportunities.map((o) => (
-            <div key={o.title} className="rounded-xl bg-zinc-900/50 p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{o.category}</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold text-white">{o.title}</p>
-                  <p className="mt-0.5 text-xs text-zinc-400">{o.pay}</p>
+      <main className="relative z-10">
+        {/* Hero Section */}
+        <section className="container mx-auto px-6 pt-24 pb-32 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-zinc-400 mb-8 animate-fade-in">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            The ultimate high-performance marketing platform
+          </div>
+
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
+            MARKET NOW.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-violet-500 to-blue-500">
+              GROW FASTER.
+            </span>
+          </h1>
+
+          <p className="max-w-2xl mx-auto text-lg md:text-xl text-zinc-400 mb-12 leading-relaxed">
+            Experience the power of Forex trading, market crash analysis, and stock performance forecasts
+            in a safe, verified, and high-speed environment.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/login"
+              className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-black text-lg rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              Start Trading Now <ArrowRight size={20} />
+            </Link>
+            <Link
+              href="/login"
+              className="w-full sm:w-auto px-8 py-4 bg-white/5 border border-white/10 text-white font-bold text-lg rounded-2xl hover:bg-white/10 transition-all"
+            >
+              View Markets
+            </Link>
+          </div>
+
+          {/* Social Proof / Stats */}
+          <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-white/5 pt-16">
+            <div className="text-center">
+              <div className="text-3xl font-black mb-1">KSh 1.2M+</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Total Returns</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-black mb-1">50k+</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Active Traders</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-black mb-1">1 sec</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Instant Gains</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-black mb-1">24/7</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Expert Support</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Feature Grid */}
+        <section className="bg-zinc-950/50 py-32 border-y border-white/5">
+          <div className="container mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              <div className="space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Zap size={28} />
                 </div>
-                <span className="rounded-full border border-yellow-500 px-2 py-0.5 text-[10px] font-semibold text-yellow-500">
-                  {o.tag}
-                </span>
+                <h3 className="text-2xl font-bold">Lightning Fast</h3>
+                <p className="text-zinc-400">Experience low-latency market analysis with real-time updates and instant success notifications.</p>
+              </div>
+              <div className="space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                  <ShieldCheck size={28} />
+                </div>
+                <h3 className="text-2xl font-bold">Secure Wallet</h3>
+                <p className="text-zinc-400">Your funds are protected with bank-grade security and integrated with M-Pesa for safe transactions.</p>
+              </div>
+              <div className="space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                  <Trophy size={28} />
+                </div>
+                <h3 className="text-2xl font-bold">Reliable Markets</h3>
+                <p className="text-zinc-400">All markets follow transparent rules with verifiable outcomes, giving everyone a fair chance to succeed.</p>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
+      </main>
 
-      {/* Recent Transactions */}
-      <section className="mt-7 px-5 pb-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Recent transactions</h2>
-          <Link href="/wallet" className="text-xs font-semibold text-yellow-500">View wallet</Link>
+      <footer className="py-12 border-t border-white/5">
+        <div className="container mx-auto px-6 text-center text-zinc-500 text-sm">
+          &copy; 2026 Pesaki Platform. All rights reserved. 18+ Trade Responsibly.
         </div>
-        <div className="mt-2 rounded-xl bg-zinc-900/50 p-2">
-          <ul className="divide-y divide-zinc-800">
-            {recentTransactions.length > 0 ? (
-              recentTransactions.map((t) => {
-                const positive = t.amount > 0;
-                return (
-                  <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${positive ? "bg-emerald-500/15 text-emerald-500" : "bg-zinc-700/50 text-zinc-400"}`}>
-                        <TrendingUp className={`h-4 w-4 ${positive ? "" : "rotate-180"}`} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{t.type}</p>
-                        <p className="truncate text-[11px] text-zinc-400">{t.date} · {t.status}</p>
-                      </div>
-                    </div>
-                    <p className={`text-sm font-bold ${positive ? "text-emerald-500" : "text-white"}`}>
-                      {positive ? "+" : ""}{fmt(t.amount).replace("KES ", "")}
-                    </p>
-                  </li>
-                );
-              })
-            ) : (
-              <li className="px-2 py-6 text-center text-sm text-zinc-500">
-                No recent transactions
-              </li>
-            )}
-          </ul>
-        </div>
-      </section>
-
-      <p className="px-5 pb-10 text-center text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-        PESAKI · Earn. Invest. Grow.
-      </p>
+      </footer>
     </div>
   );
 }
