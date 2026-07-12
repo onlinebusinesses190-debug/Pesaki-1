@@ -13,28 +13,23 @@ import {
   LogIn,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
-// Helper to format currency
 const fmt = (amount: number) => `KES ${amount?.toLocaleString() ?? 0}`;
 
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // --- FETCH YOUR REAL DATA FROM SUPABASE ---
-  // 1. Fetch Wallet Balance
+  // --- FETCH YOUR REAL DATA ---
   let balance = 0;
   let totalEarnings = 0;
   let referralEarnings = 0;
   if (user) {
     const { data: wallet } = await supabase
-      .from('wallets') // 🔥 CHANGE THIS to your actual table name (e.g., 'balances', 'user_data')
+      .from('wallets')
       .select('balance, total_earnings, referral_earnings')
       .eq('user_id', user.id)
       .single();
-    
     if (wallet) {
       balance = wallet.balance || 0;
       totalEarnings = wallet.total_earnings || 0;
@@ -42,37 +37,32 @@ export default async function HomePage() {
     }
   }
 
-  // 2. Fetch Recent Transactions (Top 5)
   let recentTransactions = [];
   if (user) {
     const { data: txs } = await supabase
-      .from('transactions') // 🔥 CHANGE THIS to your actual table name
+      .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5);
-    
     if (txs) {
       recentTransactions = txs.map(t => ({
         id: t.id,
-        type: t.type, // e.g., 'Deposit', 'Withdrawal'
+        type: t.type,
         date: new Date(t.created_at).toLocaleDateString(),
-        status: t.status, // e.g., 'Completed', 'Pending'
+        status: t.status,
         amount: t.amount,
       }));
     }
   }
 
-  // 3. Stats (These usually come from a separate stats table or aggregation)
-  // For now, keep them as static or fetch from a user_stats table
   const stats = [
-    { label: "Active Trades", value: "12", trend: "+3", tone: "success" },
-    { label: "Jobs Completed", value: "47", trend: "+5", tone: "success" },
-    { label: "Investment Growth", value: "+18.4%", trend: "YTD", tone: "gold" },
-    { label: "Businesses Funded", value: "3", trend: "Active", tone: "warning" },
+    { label: "Active Trades", value: "12", trend: "+3" },
+    { label: "Jobs Completed", value: "47", trend: "+5" },
+    { label: "Investment Growth", value: "+18.4%", trend: "YTD" },
+    { label: "Businesses Funded", value: "3", trend: "Active" },
   ];
 
-  // Opportunities (You can fetch these from a 'jobs' or 'opportunities' table later)
   const opportunities = [
     { category: "KAZI LINK", title: "Senior House Help — Karen", pay: "KES 25,000/mo", tag: "New" },
     { category: "FUNDING", title: "Agritech Startup — Series Seed", pay: "Up to KES 2M", tag: "Hot" },
@@ -82,9 +72,6 @@ export default async function HomePage() {
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Guest";
 
-  // ------------------------------------------------
-  // 🚀 YOUR UI RENDER (Using YOUR real data)
-  // ------------------------------------------------
   return (
     <div className="min-h-screen bg-black text-white">
 
@@ -115,20 +102,19 @@ export default async function HomePage() {
         <div className="relative mt-6 rounded-3xl bg-white/10 p-5 backdrop-blur-md ring-1 ring-white/15">
           <div className="flex items-center justify-between">
             <p className="text-xs uppercase tracking-wider opacity-80">Available Balance</p>
-            {/* Show/Hide toggle works, but you need to handle state on client. For simplicity, showing always here */}
-            <EyeOff className="h-4 w-4 opacity-80" /> 
+            <EyeOff className="h-4 w-4 opacity-80" />
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {fmt(balance)} {/* 👈 YOUR REAL BALANCE (KES 17,000) */}
+            {fmt(balance)}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Total Earnings</p>
-              <p className="mt-0.5 font-semibold">{fmt(totalEarnings)}</p> {/* 👈 YOUR REAL EARNINGS */}
+              <p className="mt-0.5 font-semibold">{fmt(totalEarnings)}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Referral Earnings</p>
-              <p className="mt-0.5 font-semibold">{fmt(referralEarnings)}</p> {/* 👈 YOUR REAL REFERRALS */}
+              <p className="mt-0.5 font-semibold">{fmt(referralEarnings)}</p>
             </div>
           </div>
         </div>
@@ -136,7 +122,7 @@ export default async function HomePage() {
 
       {/* Quick Actions */}
       <section className="-mt-5 px-5">
-        <Card className="grid grid-cols-4 gap-2 border-0 bg-zinc-900/50 p-3 shadow-xl backdrop-blur">
+        <div className="grid grid-cols-4 gap-2 rounded-xl bg-zinc-900/50 p-3 shadow-xl backdrop-blur">
           {[
             { label: "Deposit", icon: ArrowDownToLine, href: "/wallet" },
             { label: "Withdraw", icon: ArrowUpFromLine, href: "/wallet" },
@@ -154,18 +140,18 @@ export default async function HomePage() {
               <span className="text-[11px] font-medium">{a.label}</span>
             </Link>
           ))}
-        </Card>
+        </div>
       </section>
 
       {/* Stats Grid */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
-            <Card key={s.label} className="border-0 bg-zinc-900/50 p-3">
+            <div key={s.label} className="rounded-xl bg-zinc-900/50 p-3">
               <p className="text-xs text-zinc-400">{s.label}</p>
               <p className="text-xl font-bold text-white">{s.value}</p>
               <p className="text-[10px] text-emerald-400">{s.trend}</p>
-            </Card>
+            </div>
           ))}
         </div>
       </section>
@@ -190,7 +176,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Opportunities */}
+      {/* Latest Opportunities */}
       <section className="mt-7 px-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Latest opportunities</h2>
@@ -198,18 +184,18 @@ export default async function HomePage() {
         </div>
         <div className="mt-2 space-y-2.5">
           {opportunities.map((o) => (
-            <Card key={o.title} className="border-0 bg-zinc-900/50 !p-3.5">
+            <div key={o.title} className="rounded-xl bg-zinc-900/50 p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{o.category}</p>
                   <p className="mt-0.5 truncate text-sm font-semibold text-white">{o.title}</p>
                   <p className="mt-0.5 text-xs text-zinc-400">{o.pay}</p>
                 </div>
-                <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                <span className="rounded-full border border-yellow-500 px-2 py-0.5 text-[10px] font-semibold text-yellow-500">
                   {o.tag}
-                </Badge>
+                </span>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       </section>
@@ -220,7 +206,7 @@ export default async function HomePage() {
           <h2 className="text-lg font-bold text-white">Recent transactions</h2>
           <Link href="/wallet" className="text-xs font-semibold text-yellow-500">View wallet</Link>
         </div>
-        <Card className="mt-2 border-0 bg-zinc-900/50 !p-2">
+        <div className="mt-2 rounded-xl bg-zinc-900/50 p-2">
           <ul className="divide-y divide-zinc-800">
             {recentTransactions.length > 0 ? (
               recentTransactions.map((t) => {
@@ -248,7 +234,7 @@ export default async function HomePage() {
               </li>
             )}
           </ul>
-        </Card>
+        </div>
       </section>
 
       <p className="px-5 pb-10 text-center text-[10px] uppercase tracking-[0.2em] text-zinc-500">
