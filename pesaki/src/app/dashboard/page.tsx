@@ -7,9 +7,7 @@ import {
 import { useState } from "react";
 import { createClient } from "@/utils/supabase/server";
 
-// --- Your UI Components (imported from your mockup) ---
-// NOTE: These components must exist in your live repo at these paths.
-// If they don't, you'll need to copy them from your mockup.
+// --- Your UI Components (copy these from your mockup) ---
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 
@@ -27,7 +25,6 @@ export default async function HomePage() {
   let transactions: { id: string; type: string; date: string; status: string; amount: number }[] = [];
 
   if (user) {
-    // Fetch wallet data
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance, total_earnings, referral_earnings')
@@ -39,7 +36,6 @@ export default async function HomePage() {
       referralEarnings = wallet.referral_earnings || 0;
     }
 
-    // Fetch recent transactions
     const { data: txs } = await supabase
       .from('transactions')
       .select('*')
@@ -73,27 +69,11 @@ export default async function HomePage() {
   ];
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Guest";
-
-  // --- STATE FOR TOGGLE BALANCE ---
   const [show, setShow] = useState(true);
 
-  // --- BUILD THE STATE OBJECT FOR THE UI ---
-  const state = {
-    available: balance,
-    transactions: transactions,
-  };
+  const state = { available: balance, transactions };
+  const userData = { name: displayName, totalEarnings, referralEarnings };
 
-  // --- USER DATA FOR THE UI ---
-  const userData = {
-    name: displayName,
-    totalEarnings: totalEarnings,
-    referralEarnings: referralEarnings,
-  };
-
-  // ------------------------------------------------
-  // 🚀 YOUR UI — EXACTLY AS YOU DESIGNED IT
-  // (Unchanged from your mockup)
-  // ------------------------------------------------
   return (
     <AppShell>
       {/* Hero */}
