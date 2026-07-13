@@ -11,28 +11,33 @@ import {
   ChevronRight,
   Sparkles,
   LogIn,
+  Home,
+  BarChart2,
+  Briefcase,
+  Building2,
+  Landmark,
+  Wallet,
+  User,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 
-// Helper to format currency
 const fmt = (amount: number) => `KES ${amount?.toLocaleString() ?? 0}`;
 
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // --- FETCH YOUR REAL WALLET DATA ---
+  // --- FETCH YOUR REAL DATA ---
   let balance = 0;
   let totalEarnings = 0;
   let referralEarnings = 0;
 
   if (user) {
     const { data: wallet } = await supabase
-      .from('wallets') // 🔥 Change this to your actual table name if different
+      .from('wallets')
       .select('balance, total_earnings, referral_earnings')
       .eq('user_id', user.id)
       .single();
-    
     if (wallet) {
       balance = wallet.balance || 0;
       totalEarnings = wallet.total_earnings || 0;
@@ -40,17 +45,15 @@ export default async function HomePage() {
     }
   }
 
-  // --- FETCH YOUR REAL TRANSACTIONS (Top 5) ---
   let recentTransactions: { id: string; type: string; date: string; status: string; amount: number }[] = [];
 
   if (user) {
     const { data: txs } = await supabase
-      .from('transactions') // 🔥 Change this to your actual table name
+      .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5);
-    
     if (txs) {
       recentTransactions = txs.map((t: any) => ({
         id: t.id,
@@ -62,7 +65,6 @@ export default async function HomePage() {
     }
   }
 
-  // --- STATIC STATS (Replace with real data later) ---
   const stats = [
     { label: "Active Trades", value: "12", trend: "+3" },
     { label: "Jobs Completed", value: "47", trend: "+5" },
@@ -70,7 +72,6 @@ export default async function HomePage() {
     { label: "Businesses Funded", value: "3", trend: "Active" },
   ];
 
-  // --- STATIC OPPORTUNITIES (Replace with real data later) ---
   const opportunities = [
     { category: "KAZI LINK", title: "Senior House Help — Karen", pay: "KES 25,000/mo", tag: "New" },
     { category: "FUNDING", title: "Agritech Startup — Series Seed", pay: "Up to KES 2M", tag: "Hot" },
@@ -80,14 +81,22 @@ export default async function HomePage() {
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Guest";
 
-  // ------------------------------------------------
-  // 🚀 YOUR UI RENDER (Matches the mockup exactly)
-  // ------------------------------------------------
-  return (
-    <div className="min-h-screen bg-black text-white">
+  // Navigation items matching your mockup
+  const navItems = [
+    { label: "Home", icon: Home, href: "/" },
+    { label: "Trading", icon: BarChart2, href: "/trading" },
+    { label: "KAZI", icon: Briefcase, href: "/kazi" },
+    { label: "Business", icon: Building2, href: "/business" },
+    { label: "Banking", icon: Landmark, href: "/banking" },
+    { label: "Wallet", icon: Wallet, href: "/wallet" },
+    { label: "Profile", icon: User, href: "/profile" },
+  ];
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-800 to-black px-5 pb-8 pt-6 text-white">
+  return (
+    <div className="min-h-screen bg-black text-white pb-20"> {/* Added pb-20 for bottom nav spacing */}
+
+      {/* Hero Section - GREEN THEME */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-green-800 to-black px-5 pb-8 pt-6 text-white">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-yellow-500/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
@@ -145,7 +154,7 @@ export default async function HomePage() {
               href={a.href}
               className="flex flex-col items-center gap-1.5 rounded-xl p-2 transition-colors hover:bg-white/5"
             >
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white">
                 <a.icon className="h-5 w-5" />
               </span>
               <span className="text-[11px] font-medium">{a.label}</span>
@@ -154,7 +163,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
@@ -187,7 +196,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Latest Opportunities */}
+      {/* Opportunities */}
       <section className="mt-7 px-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Latest opportunities</h2>
@@ -211,7 +220,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Recent Transactions */}
+      {/* Transactions */}
       <section className="mt-7 px-5 pb-8">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Recent transactions</h2>
@@ -248,9 +257,27 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <p className="px-5 pb-10 text-center text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-        PESAKI · Earn. Invest. Grow.
-      </p>
+      {/* ✅ BOTTOM NAVIGATION BAR (Exact Match to Mockup) */}
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/90 backdrop-blur-md border-t border-white/10">
+        <div className="grid grid-cols-7 h-16">
+          {navItems.map((item) => {
+            const isActive = item.href === "/"; // Home is active for this page
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
+                  isActive ? "text-emerald-500" : "text-zinc-500 hover:text-white"
+                }`}
+              >
+                <item.icon className={`h-5 w-5 ${isActive ? "text-emerald-500" : ""}`} />
+                <span className="text-[10px]">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
     </div>
   );
 }
