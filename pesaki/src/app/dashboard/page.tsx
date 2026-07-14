@@ -1,78 +1,28 @@
-import Link from "next/link";
+import { createFileRoute, Link } from "next/link";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, LineChart,
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState } from "react";
-import { createClient } from "@/utils/supabase/server";
-
-// --- Your UI Components (copy these from your mockup) ---
-import { AppShell } from "@/components/AppShell";
+import { useState } from "react"; 
+import { Appshell } from "@/components/Appshell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
+import { user, stats, opportunities, fmt } from "@/lib/mock";
+import { useAuth } from "@/hooks/useAuth";
+import { useBalance } from "@/lib/balance";
 
-// --- Helper function for currency formatting ---
-const fmt = (amount: number) => `KES ${amount?.toLocaleString() ?? 0}`;
 
-export default async function HomePage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // --- FETCH YOUR REAL DATA FROM SUPABASE ---
-  let balance = 0;
-  let totalEarnings = 0;
-  let referralEarnings = 0;
-  let transactions: { id: string; type: string; date: string; status: string; amount: number }[] = [];
-
-  if (user) {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance, total_earnings, referral_earnings')
-      .eq('user_id', user.id)
-      .single();
-    if (wallet) {
-      balance = wallet.balance || 0;
-      totalEarnings = wallet.total_earnings || 0;
-      referralEarnings = wallet.referral_earnings || 0;
-    }
-
-    const { data: txs } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    if (txs) {
-      transactions = txs.map((t: any) => ({
-        id: t.id,
-        type: t.type,
-        date: new Date(t.created_at).toLocaleDateString(),
-        status: t.status,
-        amount: t.amount,
-      }));
-    }
+export const metadata = { title: "PESAKI — Dashboard" },
+      { name: "description", content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.", };
+    
   }
-
-  // --- STATIC DATA (Replace these with your real data later) ---
-  const stats = [
-    { label: "Active Trades", value: "12", trend: "+3", tone: "success" },
-    { label: "Jobs Completed", value: "47", trend: "+5", tone: "success" },
-    { label: "Investment Growth", value: "+18.4%", trend: "YTD", tone: "gold" },
-    { label: "Businesses Funded", value: "3", trend: "Active", tone: "warning" },
-  ];
-
-  const opportunities = [
-    { category: "KAZI LINK", title: "Senior House Help — Karen", pay: "KES 25,000/mo", tag: "New" },
-    { category: "FUNDING", title: "Agritech Startup — Series Seed", pay: "Up to KES 2M", tag: "Hot" },
-    { category: "ANNOUNCEMENT", title: "PESAKI Savings 12% APY", pay: "Limited time", tag: "Featured" },
-    { category: "KAZI LINK", title: "Event Workers — Nairobi Expo", pay: "KES 3,500/day", tag: "Urgent" },
-  ];
-
-  const displayName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Guest";
+  component: HomePage,
+export default function Dashboardpage() {
   const [show, setShow] = useState(true);
+  const { user: authUser } = useAuth();
+  const state = useBalance();
+  const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
 
-  const state = { available: balance, transactions };
-  const userData = { name: displayName, totalEarnings, referralEarnings };
 
   return (
     <AppShell>
@@ -81,14 +31,14 @@ export default async function HomePage() {
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome{user ? " back" : ""},</p>
+            <p className="text-xs/4 opacity-80">Welcome{authUser ? " back" : ""},</p>
             <h1 className="truncate text-2xl font-bold">{displayName} 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
-            {user ? (
+            {authUser ? (
               <Link href="/profile" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
                 {(displayName[0] ?? "P").toUpperCase()}
               </Link>
@@ -112,15 +62,16 @@ export default async function HomePage() {
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
             {show ? fmt(state.available) : "•••••••"}
+
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Total Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(userData.totalEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(user.totalEarnings) : "•••"}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Referral Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(userData.referralEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(user.referralEarnings) : "•••"}</p>
             </div>
           </div>
         </div>
@@ -130,14 +81,14 @@ export default async function HomePage() {
       <section className="-mt-5 px-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
-            { label: "Deposit",  icon: ArrowDownToLine, href: "/wallet" },
-            { label: "Withdraw", icon: ArrowUpFromLine, href: "/wallet" },
-            { label: "Transfer", icon: ArrowLeftRight,  href: "/wallet" },
-            { label: "Trading",  icon: LineChart,       href: "/trading" },
+            { label: "Deposit",  icon: ArrowDownToLine, to: "/wallet" },
+            { label: "Withdraw", icon: ArrowUpFromLine, to: "/wallet" },
+            { label: "Transfer", icon: ArrowLeftRight,  to: "/wallet" },
+            { label: "Trading",  icon: LineChart,       to: "/trading" },
           ].map((a) => (
             <Link
               key={a.label}
-              href={a.href}
+              to={a.to}
               className="flex flex-col items-center gap-1.5 rounded-xl p-2 transition-colors hover:bg-muted"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground">
@@ -195,6 +146,8 @@ export default async function HomePage() {
         </div>
       </section>
 
+
+
       {/* Promo banner */}
       <section className="mt-6 px-5">
         <div className="relative overflow-hidden rounded-2xl gradient-gold p-5 text-gold-foreground">
@@ -207,7 +160,7 @@ export default async function HomePage() {
             Lock funds for 90 days and earn premium interest.
           </p>
           <Link
-            href="/banking"
+            to="/banking"
             className="mt-3 inline-flex items-center gap-1 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background"
           >
             Start saving <ChevronRight className="h-3.5 w-3.5" />
@@ -217,7 +170,7 @@ export default async function HomePage() {
 
       {/* Opportunities */}
       <section className="mt-7 px-5">
-        <SectionTitle title="Latest opportunities" action={<Link href="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
+        <SectionTitle title="Latest opportunities" action={<Link to="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
         <div className="space-y-2.5">
           {opportunities.map((o) => (
             <Card key={o.title} className="!p-3.5">
@@ -238,10 +191,11 @@ export default async function HomePage() {
 
       {/* Recent transactions */}
       <section className="mt-7 px-5">
-        <SectionTitle title="Recent transactions" action={<Link href="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
+        <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
             {state.transactions.slice(0, 5).map((t) => {
+
               const positive = t.amount > 0;
               return (
                 <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
