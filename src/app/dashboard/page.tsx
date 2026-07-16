@@ -17,6 +17,8 @@ export const metadata = {
   description:
     "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
 };
+
+export default function HomePage() {
   const [show, setShow] = useState(true);
   const state = useBalance();
   const locked = totalLocked(state);
