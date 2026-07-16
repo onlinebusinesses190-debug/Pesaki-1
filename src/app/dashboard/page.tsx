@@ -12,7 +12,11 @@ import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, transactions, fmt } from "@/lib/mock";
 import { useBalance, totalLocked } from "@/lib/balance";
 
-export default function Dashboard() {
+export const metadata = {
+  title: "PESAKI — Dashboard",
+  description:
+    "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
+};
   const [show, setShow] = useState(true);
   const state = useBalance();
   const locked = totalLocked(state);
