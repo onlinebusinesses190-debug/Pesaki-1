@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/Appshell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { user, stats, opportunities, transactions, fmt } from "@/lib/mock";
+import { user, stats, opportunities, transactions, fmt } from import { user, stats, opportunities, fmt } from "../../lib/mock";
 import { useBalance, totalLocked } from "@/lib/balance";
 
 export const metadata = {
