@@ -1,22 +1,22 @@
-import { createFileRoute, Link } from "next/link";
+import link from "next/link";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, LineChart,
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
 import { useState } from "react"; 
-import { Appshell } from "@/components/Appshell";
+import { AppShell } from "@/components/Appshell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
 import { useBalance } from "@/lib/balance";
 
 
-export const metadata = { title: "PESAKI — Dashboard" },
-      { name: "description", content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.", };
-    
-  }
-  component: HomePage,
+export const metadata = {
+  title: "PESAKI — Dashboard",
+  description:
+    "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
+};
 export default function Dashboardpage() {
   const [show, setShow] = useState(true);
   const { user: authUser } = useAuth();
