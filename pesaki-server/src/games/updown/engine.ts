@@ -311,11 +311,3 @@ export const startUpDownRounds = () => {
   logger.info('Starting Up/Down round engine...');
   startOpen();
 };
-
-// ── Exports ────────────────────────────────────────────────────────────────────
-
-export {
-  getUpDownState,
-  placePosition,
-  startUpDownRounds,
-};
