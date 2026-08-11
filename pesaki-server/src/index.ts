@@ -10,39 +10,48 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
+// ─── Import new route modules ──────────────────────────────────────────────
+import { kaziRoutes } from './routes/kazi';
+// import { businessRoutes } from './routes/business';  // Uncomment when created
+// import { bankingRoutes } from './routes/banking';   // Uncomment when created
+
 const startServer = async () => {
   try {
-    const server = fastify({ logger: true }); 
-    
-    // Fastify CORS
+    const server = fastify({ logger: true });
+
+    // CORS
     await server.register(cors, {
       origin: (_origin, cb) => {
-        // Allow all origins for dev, or specify a list for prod
         cb(null, true);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     });
-    
+
     await setupRateLimit(server);
 
-    // Register REST API Routes
+    // ─── Register existing REST API routes ──────────────────────────────
     registerRoutes(server);
 
-    // Start Socket.io Engine
+    // ─── Register new routes ─────────────────────────────────────────────
+    server.register(kaziRoutes, { prefix: '/kazi' });
+    // server.register(businessRoutes, { prefix: '/business' });  // Uncomment when ready
+    // server.register(bankingRoutes, { prefix: '/banking' });    // Uncomment when ready
+
+    // ─── Start Socket.io ────────────────────────────────────────────────
     initSocket(server.server);
-    
-    // Initialize Game loops
+
+    // ─── Initialize Game loops ──────────────────────────────────────────
     startNewRound();
     startUpDownRounds();
-    
-    // Initialize Schedule Jobs
+
+    // ─── Initialize Scheduled Jobs ──────────────────────────────────────
     initCronJobs();
 
-    // Boot Fastify
+    // ─── Boot Fastify ───────────────────────────────────────────────────
     await server.listen({ port: env.PORT, host: '0.0.0.0' });
     logger.info(`✨ Pesaki Server listening at http://localhost:${env.PORT}`);
-    
+
   } catch (err) {
     logger.fatal(err, 'Failed to start server');
     process.exit(1);
