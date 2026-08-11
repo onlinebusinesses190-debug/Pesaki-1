@@ -127,7 +127,7 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── GET /kazi/applications ──────────────────────────────────────────────
+  // ─── GET /kazi/applications (with role filter) ──────────────────────────
   fastify.get('/applications', async (request, reply) => {
     try {
       const userId = getUserId(request.headers.authorization);
@@ -135,15 +135,25 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
 
-      const { data, error } = await supabase
+      const { role } = request.query as { role?: 'worker' | 'employer' };
+
+      let query = supabase
         .from('applications')
         .select(`
           *,
           jobs:job_id ( title, pay_label, pay_amount, employer_id, location )
-        `)
-        .or(`worker_id.eq.${userId},jobs.employer_id.eq.${userId}`)
-        .order('applied_at', { ascending: false });
+        `);
 
+      if (role === 'worker') {
+        query = query.eq('worker_id', userId);
+      } else if (role === 'employer') {
+        query = query.eq('jobs.employer_id', userId);
+      } else {
+        // Default: return both (original behavior)
+        query = query.or(`worker_id.eq.${userId},jobs.employer_id.eq.${userId}`);
+      }
+
+      const { data, error } = await query.order('applied_at', { ascending: false });
       if (error) throw error;
 
       const apps = data.map((app: any) => ({
