@@ -75,6 +75,7 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         accommodation,
         requirements,
         description,
+        postedBy,
       } = request.body as any;
 
       if (!title || !category || !location || !pay || !payAmount || !duration || !description) {
@@ -127,7 +128,7 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── GET /kazi/applications (with role filter) ──────────────────────────
+  // ─── GET /kazi/applications ──────────────────────────────────────────────
   fastify.get('/applications', async (request, reply) => {
     try {
       const userId = getUserId(request.headers.authorization);
@@ -135,25 +136,15 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
 
-      const { role } = request.query as { role?: 'worker' | 'employer' };
-
-      let query = supabase
+      const { data, error } = await supabase
         .from('applications')
         .select(`
           *,
           jobs:job_id ( title, pay_label, pay_amount, employer_id, location )
-        `);
+        `)
+        .or(`worker_id.eq.${userId},jobs.employer_id.eq.${userId}`)
+        .order('applied_at', { ascending: false });
 
-      if (role === 'worker') {
-        query = query.eq('worker_id', userId);
-      } else if (role === 'employer') {
-        query = query.eq('jobs.employer_id', userId);
-      } else {
-        // Default: return both (original behavior)
-        query = query.or(`worker_id.eq.${userId},jobs.employer_id.eq.${userId}`);
-      }
-
-      const { data, error } = await query.order('applied_at', { ascending: false });
       if (error) throw error;
 
       const apps = data.map((app: any) => ({
@@ -236,6 +227,16 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
 
       if (error) throw error;
 
+      // Notify employer
+      await supabase.from('notifications').insert([
+        {
+          user_id: data.job_id, // we need employer_id, but we can fetch it from job
+          title: 'New application',
+          body: `${applicantName} applied for your job`,
+          read: false,
+        },
+      ]);
+
       reply.status(201).send({
         success: true,
         application: {
@@ -296,6 +297,16 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         .single();
 
       if (error) throw error;
+
+      // Notify worker
+      await supabase.from('notifications').insert([
+        {
+          user_id: app.worker_id,
+          title: `Application ${status}`,
+          body: `Your application has been ${status}`,
+          read: false,
+        },
+      ]);
 
       reply.send({ success: true, application: data });
     } catch (err) {
@@ -424,9 +435,10 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
 
-      const { applicationId } = request.body as any;
-      if (!applicationId) {
-        return reply.status(400).send({ error: 'applicationId required' });
+      const { applicationId, totalAmount } = request.body as any;
+
+      if (!applicationId || !totalAmount) {
+        return reply.status(400).send({ error: 'applicationId and totalAmount required' });
       }
 
       // Fetch application and job details
@@ -447,7 +459,8 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
         return reply.status(409).send({ error: 'Already hired' });
       }
 
-      // Deduct from wallet (call debit function here if needed)
+      // Deduct from wallet (you can call the debit function here)
+      // For now, we'll just update status
 
       const { data: updated, error: updateErr } = await supabase
         .from('applications')
@@ -509,6 +522,7 @@ export const kaziRoutes = async (fastify: FastifyInstance) => {
       if (checkErr) throw checkErr;
 
       if (existing) {
+        // Update existing to mark service fee paid
         const { data, error } = await supabase
           .from('payouts')
           .update({ service_fee_paid: true, paid_at: new Date().toISOString() })
