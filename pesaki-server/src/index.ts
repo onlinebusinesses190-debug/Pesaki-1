@@ -12,6 +12,7 @@ import { setupRateLimit } from './middleware/rateLimit';
 
 // ─── Import new route modules ──────────────────────────────────────────────
 import { kaziRoutes } from './routes/kazi';
+import { testRoutes } from './routes/test';  // ✅ ADDED TEST ROUTE
 // import { businessRoutes } from './routes/business';  // Uncomment when created
 // import { bankingRoutes } from './routes/banking';   // Uncomment when created
 
@@ -35,6 +36,7 @@ const startServer = async () => {
 
     // ─── Register new routes ─────────────────────────────────────────────
     server.register(kaziRoutes, { prefix: '/kazi' });
+    server.register(testRoutes, { prefix: '/test' });  // ✅ TEST ROUTE
     // server.register(businessRoutes, { prefix: '/business' });  // Uncomment when ready
     // server.register(bankingRoutes, { prefix: '/banking' });    // Uncomment when ready
 
