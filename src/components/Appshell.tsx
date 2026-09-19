@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "next/link";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   Home, LineChart, Briefcase, Building2, Landmark, Wallet, User,
@@ -15,7 +16,7 @@ const nav = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = usePathname();
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">

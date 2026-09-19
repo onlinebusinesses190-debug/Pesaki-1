@@ -3,6 +3,8 @@ create table public.profiles (
   id uuid references auth.users on delete cascade not null primary key,
   phone text,
   role text default 'user',
+  referral_code text unique,
+  referred_by uuid references public.profiles(id),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -17,6 +19,9 @@ create policy "Users can insert their own profile." on public.profiles
 
 create policy "Users can update own profile." on public.profiles
   for update using (auth.uid() = id);
+
+create policy "Users can view referral codes." on public.profiles
+  for select using (true);
 
 -- WALLETS TABLE
 create table public.wallets (
@@ -72,6 +77,7 @@ create or replace function public.handle_new_user()
 returns trigger as $$
 declare
   cleaned_phone text;
+  generated_code text;
 begin
   -- If phone is available directly, use it. 
   -- Otherwise, if it's an email-based workaround, strip "@pesaki.com"
@@ -83,8 +89,11 @@ begin
     cleaned_phone := new.email; -- Fallback to full email
   end if;
 
-  insert into public.profiles (id, phone)
-  values (new.id, cleaned_phone);
+  -- Auto-generate a unique referral code: PESAKI + 6 random alphanumeric chars
+  generated_code := 'PESAKI' || upper(substr(md5(random()::text), 1, 6));
+
+  insert into public.profiles (id, phone, referral_code, referred_by)
+  values (new.id, cleaned_phone, generated_code, NULL);
   
   insert into public.wallets (user_id, balance, demo_balance)
   values (new.id, 0.00, 10000.00);
@@ -323,3 +332,22 @@ create table public.mpesa_withdrawals (
 alter table public.mpesa_withdrawals enable row level security;
 create policy "Users view own withdrawals" on public.mpesa_withdrawals for select using (auth.uid() = user_id);
 create policy "Users can insert own withdrawals" on public.mpesa_withdrawals for insert with check (auth.uid() = user_id);
+
+-- REFERRALS TRACKING
+create table public.referrals (
+  id uuid default gen_random_uuid() primary key,
+  referrer_id uuid references public.profiles(id) on delete cascade not null,
+  referred_id uuid references public.profiles(id) on delete cascade not null,
+  deposit_amount decimal(12, 2),
+  bonus_amount decimal(12, 2),
+  status text default 'pending' check (status in ('pending', 'credited', 'failed')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.referrals enable row level security;
+
+create policy "Referrers view own referrals" on public.referrals for select using (auth.uid() = referrer_id);
+create policy "Referred view own referral record" on public.referrals for select using (auth.uid() = referred_id);
+
+create index idx_referrals_referrer on public.referrals(referrer_id);
+create index idx_referrals_referred on public.referrals(referred_id);

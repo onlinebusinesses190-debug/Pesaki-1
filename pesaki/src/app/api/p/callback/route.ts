@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+async function normalizePhone(raw: string): Promise<string> {
+    const digits = String(raw).replace(/\s+/g, '').replace(/[^0-9]/g, '')
+    if (digits.startsWith('0')) return '254' + digits.slice(1)
+    if (digits.startsWith('7') || digits.startsWith('1')) return '254' + digits
+    if (digits.startsWith('+254')) return digits.slice(1)
+    if (digits.startsWith('254')) return digits
+    return digits
+}
+
 export async function POST(request: Request) {
     try {
         // Use service role key for server-side wallet update (bypasses RLS)
@@ -31,28 +40,41 @@ export async function POST(request: Request) {
 
         const amount = Number(get('Amount'))
         const mpesaReceiptNumber = get('MpesaReceiptNumber')
-        const phoneNumber = String(get('PhoneNumber'))
+        const rawPhone = String(get('PhoneNumber'))
 
-        if (!amount || !phoneNumber) {
+        if (!amount || !rawPhone) {
             console.error('[M-Pesa Callback] Missing amount or phone number in callback')
             return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
         }
 
-        // Look up wallet by phone number
-        const { data: wallet, error: walletError } = await supabaseAdmin
-            .from('wallets')
-            .select('id, balance')
-            .eq('phone_number', phoneNumber)
-            .single()
+        const phoneNumber = await normalizePhone(rawPhone)
 
-        if (walletError || !wallet) {
-            console.error('[M-Pesa Callback] Wallet not found for phone:', phoneNumber, walletError)
+        // Look up the user's profile by phone number, then find their wallet
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, phone, referred_by')
+            .eq('phone', phoneNumber)
+            .maybeSingle()
+
+        if (profileError || !profile) {
+            console.error('[M-Pesa Callback] Profile not found for phone:', phoneNumber, profileError)
             // Still return 200 to Safaricom so they don't keep retrying
             return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
         }
 
+        const { data: wallet, error: walletError } = await supabaseAdmin
+            .from('wallets')
+            .select('id, balance, user_id')
+            .eq('user_id', profile.id)
+            .single()
+
+        if (walletError || !wallet) {
+            console.error('[M-Pesa Callback] Wallet not found for user:', profile.id, walletError)
+            return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+        }
+
         // Credit the wallet
-        const newBalance = wallet.balance + amount
+        const newBalance = Number(wallet.balance) + amount
 
         const { error: updateError } = await supabaseAdmin
             .from('wallets')
@@ -74,7 +96,55 @@ export async function POST(request: Request) {
             metadata: { mpesa_receipt: mpesaReceiptNumber, phone: phoneNumber },
         })
 
-        console.log(`[M-Pesa Callback] ✅ Credited KSh ${amount} to wallet ${wallet.id}. New balance: ${newBalance}`)
+        console.log(`[M-Pesa Callback] Credited KSh ${amount} to wallet ${wallet.id}. New balance: ${newBalance}`)
+
+        // --- Referral bonus ---
+        // If the depositing user was referred by someone, credit a bonus to the referrer
+        if (profile.referred_by) {
+            const referralBonus = Math.min(amount * 0.1, 500) // 10% of deposit, capped at KSh 500
+            try {
+                const { data: referrerWallet, error: refWalletError } = await supabaseAdmin
+                    .from('wallets')
+                    .select('id, balance, user_id')
+                    .eq('user_id', profile.referred_by)
+                    .maybeSingle()
+
+                if (!refWalletError && referrerWallet) {
+                    const refNewBalance = Number(referrerWallet.balance) + referralBonus
+
+                    await supabaseAdmin
+                        .from('wallets')
+                        .update({ balance: refNewBalance })
+                        .eq('id', referrerWallet.id)
+
+                    await supabaseAdmin.from('transactions').insert({
+                        wallet_id: referrerWallet.id,
+                        type: 'win',
+                        amount: referralBonus,
+                        is_demo: false,
+                        game_type: 'referral',
+                        metadata: { referrer_bonus: true, referred_user: profile.id, source_deposit: amount },
+                    })
+
+                    try {
+                        await supabaseAdmin.from('referrals').insert({
+                            referrer_id: profile.referred_by,
+                            referred_id: profile.id,
+                            deposit_amount: amount,
+                            bonus_amount: referralBonus,
+                        })
+                    } catch (refInsertErr) {
+                        // tolerate if referrals table not yet created
+                        console.debug('[M-Pesa Callback] Referral record insert skipped:', refInsertErr)
+                    }
+
+                    console.log(`[M-Pesa Callback] Credited KSh ${referralBonus} referral bonus to referrer ${profile.referred_by}. New balance: ${refNewBalance}`)
+                }
+            } catch (refErr) {
+                console.error('[M-Pesa Callback] Referral bonus credit failed:', refErr)
+                // Don't fail the main deposit if referral bonus fails
+            }
+        }
 
         return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
     } catch (err) {

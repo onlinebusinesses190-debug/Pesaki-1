@@ -1,33 +1,33 @@
-import link from "next/link";
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, LineChart,
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState } from "react"; 
-import { AppShell } from "@/components/Appshell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
 import { useBalance } from "@/lib/balance";
-
 
 export const metadata = {
   title: "PESAKI — Dashboard",
   description:
     "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
 };
+
 export default function Dashboardpage() {
   const [show, setShow] = useState(true);
   const { user: authUser } = useAuth();
   const state = useBalance();
   const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
 
-
   return (
-    <AppShell>
-      {/* Hero */}
-      <section className="gradient-primary relative overflow-hidden px-5 pb-8 pt-6 text-primary-foreground">
+    <>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-3xl gradient-primary px-5 pb-8 pt-6 text-primary-foreground">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
@@ -53,16 +53,16 @@ export default function Dashboardpage() {
           </div>
         </div>
 
+        {/* Balance Card */}
         <div className="relative mt-6 rounded-3xl bg-white/10 p-5 backdrop-blur-md ring-1 ring-white/15">
           <div className="flex items-center justify-between">
             <p className="text-xs uppercase tracking-wider opacity-80">Available Balance</p>
-            <button onClick={() => setShow(!show)} className="opacity-80">
+            <button onClick={() => setShow(!show)} className="opacity-80 hover:opacity-100 transition-opacity">
               {show ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </button>
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
             {show ? fmt(state.available) : "•••••••"}
-
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
@@ -77,18 +77,18 @@ export default function Dashboardpage() {
         </div>
       </section>
 
-      {/* Quick actions */}
-      <section className="-mt-5 px-5">
+      {/* Quick Actions */}
+      <section className="-mt-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
-            { label: "Deposit",  icon: ArrowDownToLine, to: "/wallet" },
-            { label: "Withdraw", icon: ArrowUpFromLine, to: "/wallet" },
-            { label: "Transfer", icon: ArrowLeftRight,  to: "/wallet" },
-            { label: "Trading",  icon: LineChart,       to: "/trading" },
+            { label: "Deposit", icon: ArrowDownToLine, href: "/dashboard/wallet" },
+            { label: "Withdraw", icon: ArrowUpFromLine, href: "/dashboard/wallet" },
+            { label: "Transfer", icon: ArrowLeftRight, href: "/dashboard/wallet" },
+            { label: "Trading", icon: LineChart, href: "/dashboard/fx" },
           ].map((a) => (
             <Link
               key={a.label}
-              to={a.to}
+              href={a.href}
               className="flex flex-col items-center gap-1.5 rounded-xl p-2 transition-colors hover:bg-muted"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground">
@@ -100,8 +100,8 @@ export default function Dashboardpage() {
         </Card>
       </section>
 
-      {/* Stats */}
-      <section className="mt-5 px-5">
+      {/* Stats Grid */}
+      <section className="mt-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
             <Stat key={s.label} label={s.label} value={s.value} hint={s.trend} tone={s.tone} />
@@ -109,17 +109,17 @@ export default function Dashboardpage() {
         </div>
       </section>
 
-      {/* Explore hubs */}
-      <section className="mt-6 px-5">
+      {/* Explore Hubs */}
+      <section className="mt-6">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
-          <Link href="/trading" className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)]">
+          <Link href="/dashboard/fx" className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
             <LineChart className="mb-6 h-5 w-5 opacity-90" />
             <p className="text-sm font-bold">Trading Floor</p>
             <p className="mt-0.5 text-[11px] opacity-80">FX · Up/Down · Aviator</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link href="/kazi" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+          <Link href="/kazi" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
               <Briefcase className="h-4 w-4" />
             </span>
@@ -127,7 +127,7 @@ export default function Dashboardpage() {
             <p className="mt-0.5 text-[11px] text-muted-foreground">Find work · Hire talent</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link href="/business" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+          <Link href="/business" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl gradient-gold text-gold-foreground">
               <Building2 className="h-4 w-4" />
             </span>
@@ -135,7 +135,7 @@ export default function Dashboardpage() {
             <p className="mt-0.5 text-[11px] text-muted-foreground">Grow · Fund · Scale</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link href="/banking" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+          <Link href="/banking" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] hover:shadow-lg transition-shadow">
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-success/15 text-success">
               <Landmark className="h-4 w-4" />
             </span>
@@ -146,10 +146,8 @@ export default function Dashboardpage() {
         </div>
       </section>
 
-
-
-      {/* Promo banner */}
-      <section className="mt-6 px-5">
+      {/* Featured Promo */}
+      <section className="mt-6">
         <div className="relative overflow-hidden rounded-2xl gradient-gold p-5 text-gold-foreground">
           <Sparkles className="absolute -right-2 -top-2 h-24 w-24 opacity-20" />
           <p className="text-[11px] font-semibold uppercase tracking-wider">Featured</p>
@@ -160,8 +158,8 @@ export default function Dashboardpage() {
             Lock funds for 90 days and earn premium interest.
           </p>
           <Link
-            to="/banking"
-            className="mt-3 inline-flex items-center gap-1 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background"
+            href="/banking"
+            className="mt-3 inline-flex items-center gap-1 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:opacity-90 transition-opacity"
           >
             Start saving <ChevronRight className="h-3.5 w-3.5" />
           </Link>
@@ -169,18 +167,17 @@ export default function Dashboardpage() {
       </section>
 
       {/* Opportunities */}
-      <section className="mt-7 px-5">
-        <SectionTitle title="Latest opportunities" action={<Link to="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
-        <div className="space-y-2.5">
+      <section className="mt-7">
+        <SectionTitle title="Latest opportunities" action={<Link href="/kazi" className="text-xs font-semibold text-primary hover:underline">See all</Link>} />        <div className="space-y-2.5">
           {opportunities.map((o) => (
-            <Card key={o.title} className="!p-3.5">
+            <Card key={o.title} className="!p-3.5 hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{o.category}</p>
                   <p className="mt-0.5 truncate text-sm font-semibold">{o.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{o.pay}</p>
                 </div>
-                <Badge tone={o.tag === "Urgent" ? "destructive" : o.tag === "Hot" ? "warning" : "gold"}>
+                <Badge tone={o.tag === "Urgent" ? "destructive" : o.tag === "Hot" ? "warning" : o.tag === "Featured" ? "gold" : "neutral"}>
                   {o.tag}
                 </Badge>
               </div>
@@ -189,13 +186,12 @@ export default function Dashboardpage() {
         </div>
       </section>
 
-      {/* Recent transactions */}
-      <section className="mt-7 px-5">
-        <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
+      {/* Recent Transactions */}
+      <section className="mt-7">
+        <SectionTitle title="Recent transactions" action={<Link href="/dashboard/wallet" className="text-xs font-semibold text-primary hover:underline">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
             {state.transactions.slice(0, 5).map((t) => {
-
               const positive = t.amount > 0;
               return (
                 <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
@@ -218,9 +214,9 @@ export default function Dashboardpage() {
         </Card>
       </section>
 
-      <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground pb-8">
         PESAKI · Earn. Invest. Grow.
       </p>
-    </AppShell>
+    </>
   );
 }

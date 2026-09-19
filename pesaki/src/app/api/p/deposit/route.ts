@@ -80,8 +80,6 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        const parentShortCode = '4574053' // The primary shortcode linked to your Daraja App
-        const storeNumber = '5710970'     // Your Store Number
         const tillNumber = '3240141'      // Your Till Number
         const passkey = (process.env.DARAJA_PASSKEY || '').trim()
         const callbackUrl = (process.env.DARAJA_CALLBACK_URL || '').trim()
@@ -98,30 +96,31 @@ export async function POST(request: Request) {
             + String(eatDate.getMinutes()).padStart(2, '0')
             + String(eatDate.getSeconds()).padStart(2, '0')
 
+        // For CustomerBuyGoodsOnline (Till STK Push), BusinessShortCode and password
+        // must use the Till number, not the parent shortcode.
         // Password must match the BusinessShortCode used below
-        const password = Buffer.from(`${parentShortCode}${passkey}${timestamp}`).toString('base64')
+        const password = Buffer.from(`${tillNumber}${passkey}${timestamp}`).toString('base64')
         const accessToken = await getDarajaToken()
 
         const transactionType = 'CustomerBuyGoodsOnline'
         const accountRef = `PAY${user.id.slice(0, 5).toUpperCase()}`
 
         const payload = {
-            BusinessShortCode: parentShortCode,
+            BusinessShortCode: tillNumber, // Till number for CustomerBuyGoodsOnline
             Password: password,
             Timestamp: timestamp,
             TransactionType: transactionType,
             Amount: Math.floor(Number(amount)),
             PartyA: normalizedPhone,
-            PartyB: tillNumber, // Trying the Till Number as PartyB
+            PartyB: tillNumber,
             PhoneNumber: normalizedPhone,
             CallBackURL: callbackUrl,
             AccountReference: accountRef,
             TransactionDesc: 'Deposit',
         }
 
-        console.info('[STK Push Initiating - Parent/Till Combo]', { 
-            parentShortCode, 
-            tillNumber,
+        console.info('[STK Push Initiating - Till]', { 
+            tillNumber, 
             phone: normalizedPhone, 
             amount: payload.Amount 
         })
@@ -176,8 +175,8 @@ export async function POST(request: Request) {
             CheckoutRequestID: data.CheckoutRequestID,
             CustomerMessage: data.CustomerMessage,
         })
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[STK Push Exception]', err)
-        return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
     }
 }
